@@ -23,6 +23,12 @@ d'achat affilié.
   l'IA renvoie un JSON strict avec les morphologies qu'il met en valeur.
 - Onglet **Ventes Privées** : articles à -30 % et plus, triés par compatibilité
   morphologique puis remise, toujours dans ton budget.
+- Onglet **« Conseils with Zahra »** : chatbot styliste avec l'avatar de Zahra —
+  répond via Gemini (fonction `ask-zahra`) quand elle est déployée, sinon via le
+  moteur de conseils intégré (entretien, mariage, soirée, couleurs, jean…),
+  toujours personnalisé selon la silhouette et le budget.
+  Pour afficher ta vraie photo dans le chat : ajoute `assets/zahra.jpg` puis
+  modifie la constante `PHOTO` dans `src/components/ZahraAvatar.tsx`.
 
 ## 🧱 Stack
 
@@ -45,9 +51,10 @@ npx expo start         # scanne le QR code avec Expo Go
 
 1. **Table + sécurité** : ouvre le [SQL Editor](https://supabase.com/dashboard) de ton
    projet et exécute `supabase/schema.sql`.
-2. **Fonction IA** :
+2. **Fonctions IA** :
    ```bash
    supabase functions deploy tag-morphology
+   supabase functions deploy ask-zahra
    supabase secrets set GEMINI_API_KEY=<clé_créée_sur_aistudio.google.com>
    ```
 3. **Cron du flux Awin** (quand le programme Shein est approuvé) :
