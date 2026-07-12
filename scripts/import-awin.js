@@ -7,7 +7,38 @@
  */
 const fs = require('fs');
 const path = require('path');
+const http = require('http');
+const https = require('https');
+const zlib = require('zlib');
+const { promisify } = require('util');
 const { Client } = require('pg');
+
+const gunzip = promisify(zlib.gunzip);
+
+function downloadFeed(url, redirectsLeft = 5) {
+  return new Promise((resolve, reject) => {
+    const lib = url.startsWith('https:') ? https : http;
+    const opts = url.startsWith('https:') ? { rejectUnauthorized: false } : {};
+    const req = lib.get(url, opts, (res) => {
+      if ([301, 302, 307, 308].includes(res.statusCode) && res.headers.location) {
+        if (redirectsLeft <= 0) return reject(new Error('Trop de redirections Awin'));
+        const next = new URL(res.headers.location, url).href;
+        return resolve(downloadFeed(next, redirectsLeft - 1));
+      }
+      if (res.statusCode >= 400) {
+        return reject(new Error(`Flux Awin inaccessible (${res.statusCode})`));
+      }
+      const chunks = [];
+      res.on('data', (chunk) => chunks.push(chunk));
+      res.on('end', () => resolve({
+        buffer: Buffer.concat(chunks),
+        contentType: res.headers['content-type'] ?? '',
+      }));
+      res.on('error', reject);
+    });
+    req.on('error', reject);
+  });
+}
 
 function loadEnv() {
   const envPath = path.join(__dirname, '..', '.env');
@@ -91,15 +122,38 @@ async function main() {
     process.exit(1);
   }
 
-  console.log('Téléchargement du flux Awin...');
-  const feedResponse = await fetch(feedUrl);
-  if (!feedResponse.ok) {
-    throw new Error(`Flux Awin inaccessible (${feedResponse.status})`);
-  }
+  let csv;
+  const localPath = feedUrl.startsWith('file://')
+    ? feedUrl.slice('file://'.length)
+    : fs.existsSync(feedUrl) ? feedUrl : null;
 
-  let csv = await feedResponse.text();
-  if (feedUrl.includes('.zip') || feedResponse.headers.get('content-type')?.includes('zip')) {
-    throw new Error('Flux ZIP non supporté en local — utilise format CSV non compressé dans Create-a-Feed');
+  if (localPath) {
+    console.log(`Lecture du flux local : ${localPath}`);
+    const raw = fs.readFileSync(localPath);
+    csv = localPath.endsWith('.gz')
+      ? (await gunzip(raw)).toString('utf8')
+      : raw.toString('utf8');
+  } else {
+    if (feedUrl.includes('/feedList')) {
+      throw new Error(
+        'AWIN_FEED_URL pointe vers feedList (page HTML). Copie une URL de la colonne URL dans datafeeds.csv',
+      );
+    }
+    console.log('Téléchargement du flux Awin...');
+    const { buffer, contentType } = await downloadFeed(feedUrl);
+    const isZip =
+      feedUrl.endsWith('.zip') ||
+      /application\/(x-)?zip/i.test(contentType);
+    if (isZip) {
+      throw new Error('Flux ZIP non supporté — utilise CSV ou CSV.GZ');
+    }
+
+    const isGzip =
+      feedUrl.includes('.gz') ||
+      feedUrl.includes('compression/gzip') ||
+      contentType.includes('gzip') ||
+      (buffer.length >= 2 && buffer[0] === 0x1f && buffer[1] === 0x8b);
+    csv = isGzip ? (await gunzip(buffer)).toString('utf8') : buffer.toString('utf8');
   }
 
   const lines = csv.split(/\r?\n/).filter((l) => l.trim().length > 0);
@@ -197,5 +251,6 @@ async function main() {
 
 main().catch((e) => {
   console.error('Échec import :', e.message);
+  if (e.cause?.message) console.error('Cause :', e.cause.message);
   process.exit(1);
 });

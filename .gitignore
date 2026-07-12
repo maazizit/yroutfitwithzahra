@@ -32,3 +32,4 @@ yarn-error.*
 .env.local
 .env.*.local
 supabase/.env
+datafeeds.csv
