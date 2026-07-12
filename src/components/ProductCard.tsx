@@ -6,6 +6,7 @@ import { morphologyLabel, type Morphology } from '@/lib/morphology';
 import type { Product } from '@/lib/types';
 import { colors, radius, serif, shadow } from '@/theme';
 import { ScalePressable, usePopAnimation } from './anim';
+import { CategoryIcon } from './CategoryIcon';
 
 interface Props {
   product: Product;
@@ -54,7 +55,11 @@ export function ProductCard({ product, userMorphology }: Props) {
             />
           </Animated.View>
         ) : (
-          <Text style={styles.imageFallback}>{product.brand.charAt(0)}</Text>
+          <View style={styles.placeholder}>
+            <CategoryIcon category={product.category} size={52} color={colors.accent} />
+            <Text style={styles.placeholderBrand}>{product.brand}</Text>
+            <Text style={styles.placeholderNote}>Photo à venir avec le flux Awin</Text>
+          </View>
         )}
 
         {discount !== null && (
@@ -147,10 +152,22 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
   },
-  imageFallback: {
+  placeholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: 12,
+  },
+  placeholderBrand: {
     fontFamily: serif,
-    fontSize: 44,
-    color: colors.accent,
+    fontSize: 15,
+    letterSpacing: 2,
+    color: colors.accentDark,
+  },
+  placeholderNote: {
+    fontSize: 9.5,
+    color: colors.muted,
+    textAlign: 'center',
   },
   discountBadge: {
     position: 'absolute',

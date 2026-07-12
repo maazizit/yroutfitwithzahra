@@ -75,11 +75,17 @@ export default function ShopScreen() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
         <LogoHeader subtitle="Sublime ta forme" />
-        <View style={styles.profilePill}>
+        <Pressable
+          style={styles.profilePill}
+          onPress={() => router.push('/(tabs)/profile')}
+          accessibilityRole="button"
+          accessibilityLabel="Modifier ma silhouette et mon budget"
+        >
           <Text style={styles.profilePillText}>
-            {morphologyLabel(profile.morphology)} · ≤ {profile.budget} €
+            {profile.modestMode ? '🧕 ' : ''}
+            {morphologyLabel(profile.morphology)} · ≤ {profile.budget} € ›
           </Text>
-        </View>
+        </Pressable>
       </View>
 
       <FadeInView delay={80} dy={8}>
