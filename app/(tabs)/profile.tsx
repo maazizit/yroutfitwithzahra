@@ -15,10 +15,9 @@ import { FadeInView } from '@/components/anim';
 import { BudgetSlider } from '@/components/BudgetSlider';
 import { LogoHeader } from '@/components/Logo';
 import { MorphologyPicker } from '@/components/MorphologyPicker';
-import { SizePicker } from '@/components/SizePicker';
+import { StylePreferencesPicker } from '@/components/StylePreferencesPicker';
 import { tagGarment, type MorphoTagResult } from '@/lib/gemini';
 import { morphologyInfo, morphologyLabel, type Morphology } from '@/lib/morphology';
-import { sizeLabel } from '@/lib/sizes';
 import { useProfile } from '@/lib/profile';
 import { colors, radius, serif } from '@/theme';
 
@@ -28,7 +27,8 @@ export default function ProfileScreen() {
   const [morphology, setMorphology] = useState<Morphology | null>(profile?.morphology ?? null);
   const [budget, setBudget] = useState(profile?.budget ?? 30);
   const [modestMode, setModestMode] = useState(profile?.modestMode ?? false);
-  const [clothingSize, setClothingSize] = useState<string | null>(profile?.clothingSize ?? null);
+  const [clothingSizes, setClothingSizes] = useState<string[]>(profile?.clothingSizes ?? []);
+  const [favoriteColors, setFavoriteColors] = useState<string[]>(profile?.favoriteColors ?? []);
   const [saved, setSaved] = useState(false);
 
   const [aiInput, setAiInput] = useState('');
@@ -38,7 +38,7 @@ export default function ProfileScreen() {
 
   const save = async () => {
     if (!morphology) return;
-    await saveProfile({ morphology, budget, modestMode, clothingSize });
+    await saveProfile({ morphology, budget, modestMode, clothingSizes, favoriteColors });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -91,12 +91,13 @@ export default function ProfileScreen() {
           <BudgetSlider value={budget} onChange={setBudget} />
         </View>
 
-        <Text style={styles.sectionTitle}>Ma taille</Text>
+        <Text style={styles.sectionTitle}>Tailles & couleurs</Text>
         <View style={styles.card}>
-          <SizePicker
-            value={clothingSize}
-            onChange={setClothingSize}
-            label={clothingSize ? sizeLabel(clothingSize) : 'Toutes tailles — aucun filtre'}
+          <StylePreferencesPicker
+            sizes={clothingSizes}
+            colors={favoriteColors}
+            onChangeSizes={setClothingSizes}
+            onChangeColors={setFavoriteColors}
             compact
           />
         </View>

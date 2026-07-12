@@ -7,7 +7,7 @@ import { FadeInView, PulseView, ScalePressable } from '@/components/anim';
 import { BudgetSlider } from '@/components/BudgetSlider';
 import { BrandLogo } from '@/components/Logo';
 import { MorphologyPicker } from '@/components/MorphologyPicker';
-import { SizePicker } from '@/components/SizePicker';
+import { StylePreferencesPicker } from '@/components/StylePreferencesPicker';
 import type { Morphology } from '@/lib/morphology';
 import { useProfile } from '@/lib/profile';
 import { colors, radius, serif } from '@/theme';
@@ -19,7 +19,8 @@ export default function Onboarding() {
   const [morphology, setMorphology] = useState<Morphology | null>(null);
   const [budget, setBudget] = useState(30);
   const [modestMode, setModestMode] = useState(false);
-  const [clothingSize, setClothingSize] = useState<string | null>(null);
+  const [clothingSizes, setClothingSizes] = useState<string[]>([]);
+  const [favoriteColors, setFavoriteColors] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
   const next = async () => {
@@ -30,7 +31,7 @@ export default function Onboarding() {
     if (!morphology || saving) return;
     setSaving(true);
     try {
-      await saveProfile({ morphology, budget, modestMode, clothingSize });
+      await saveProfile({ morphology, budget, modestMode, clothingSizes, favoriteColors });
       router.replace('/(tabs)/shop');
     } finally {
       setSaving(false);
@@ -83,11 +84,16 @@ export default function Onboarding() {
               </View>
             </FadeInView>
             <FadeInView delay={180}>
-              <Text style={styles.sizeTitle}>Ta taille habituelle ?</Text>
+              <Text style={styles.sizeTitle}>Tailles & couleurs</Text>
               <Text style={styles.sizeSubtitle}>
-                On masquera les articles indisponibles dans ta taille. Laisse « Toutes » pour tout voir.
+                Multi-sélection — curvy & plus-size inclus. Laisse vide pour tout explorer.
               </Text>
-              <SizePicker value={clothingSize} onChange={setClothingSize} />
+              <StylePreferencesPicker
+                sizes={clothingSizes}
+                colors={favoriteColors}
+                onChangeSizes={setClothingSizes}
+                onChangeColors={setFavoriteColors}
+              />
             </FadeInView>
             <FadeInView delay={240}>
               <View style={styles.modestCard}>

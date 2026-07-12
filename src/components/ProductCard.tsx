@@ -1,6 +1,7 @@
 import { AntDesign } from '@expo/vector-icons';
 import React, { useRef, useState } from 'react';
 import { Animated, Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { colorLabel, colorSwatch } from '@/lib/colors';
 import { buildPurchaseUrl, discountPercent, formatPrice } from '@/lib/affiliate';
 import { morphologyLabel, type Morphology } from '@/lib/morphology';
 import type { Product } from '@/lib/types';
@@ -157,6 +158,17 @@ export function ProductCard({ product, userMorphology }: Props) {
         {product.sizes && product.sizes.length > 0 && (
           <Text style={styles.sizes}>{product.sizes.slice(0, 4).join(' · ')}</Text>
         )}
+        {product.colors && product.colors.length > 0 && (
+          <View style={styles.colorRow}>
+            {product.colors.slice(0, 5).map((c) => (
+              <View
+                key={c}
+                style={[styles.colorDot, { backgroundColor: colorSwatch(c) }]}
+                accessibilityLabel={colorLabel(c)}
+              />
+            ))}
+          </View>
+        )}
         <View style={styles.priceRow}>
           <Text style={styles.price}>{formatPrice(product.price, product.currency)}</Text>
           {product.originalPrice && discount !== null && (
@@ -309,6 +321,18 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: -4,
     marginBottom: 2,
+  },
+  colorRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 4,
+  },
+  colorDot: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   priceRow: {
     flexDirection: 'row',

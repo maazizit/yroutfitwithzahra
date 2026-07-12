@@ -29,7 +29,7 @@ const ProfileContext = createContext<ProfileContextValue>({
 function parseProfile(raw: string | null): UserProfile | null {
   if (!raw) return null;
   try {
-    const parsed = JSON.parse(raw) as Partial<UserProfile>;
+    const parsed = JSON.parse(raw) as Partial<UserProfile> & { clothingSize?: string };
     if (
       parsed &&
       typeof parsed.budget === 'number' &&
@@ -41,10 +41,14 @@ function parseProfile(raw: string | null): UserProfile | null {
         morphology: parsed.morphology,
         budget: parsed.budget,
         modestMode: parsed.modestMode === true,
-        clothingSize:
-          typeof parsed.clothingSize === 'string' && parsed.clothingSize.length > 0
-            ? parsed.clothingSize
-            : null,
+        clothingSizes: Array.isArray(parsed.clothingSizes)
+          ? parsed.clothingSizes.filter((s): s is string => typeof s === 'string')
+          : typeof parsed.clothingSize === 'string' && parsed.clothingSize
+            ? [parsed.clothingSize]
+            : [],
+        favoriteColors: Array.isArray(parsed.favoriteColors)
+          ? parsed.favoriteColors.filter((c): c is string => typeof c === 'string')
+          : [],
       } as UserProfile;
     }
     return null;

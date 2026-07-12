@@ -1,9 +1,11 @@
 import { discountPercent } from './affiliate';
-import { matchesClothingSize } from './sizes';
+import { isClothingProduct, isLikelyGiftOrSample } from './catalog';
+import { matchesColors } from './colors';
 import type { Morphology } from './morphology';
 import { ALL_MORPHOLOGIES } from './morphology';
+import { matchesClothingSizes } from './sizes';
 import { supabase } from './supabase';
-import type { Category, Product, UserProfile } from './types';
+import type { Category, Product, ShopFilterState, UserProfile } from './types';
 
 const CATEGORIES: Category[] = ['Robes', 'Hauts', 'Bas', 'Vestes', 'Accessoires'];
 
@@ -21,9 +23,13 @@ interface ProductRow {
   category: string | null;
   modest: boolean | null;
   sizes: string[] | null;
+  colours: string[] | null;
 }
 
-function rowToProduct(row: ProductRow): Product {
+function rowToProduct(row: ProductRow): Product | null {
+  if (isLikelyGiftOrSample(row.name, Number(row.price))) return null;
+  if (!isClothingProduct(row.name, row.category ?? undefined)) return null;
+
   const tags = (row.tags ?? []).filter((t): t is Morphology =>
     (ALL_MORPHOLOGIES as string[]).includes(t),
   );
@@ -44,17 +50,12 @@ function rowToProduct(row: ProductRow): Product {
     category,
     modest: row.modest === true,
     sizes: row.sizes?.length ? row.sizes.map((s) => s.trim()).filter(Boolean) : [],
+    colors: row.colours?.length ? row.colours.map((c) => c.trim()).filter(Boolean) : [],
   };
 }
 
 const FETCH_TIMEOUT_MS = 10000;
 
-/**
- * Charge le catalogue depuis la table Supabase `products`,
- * remplie par l'import du flux Awin (scripts/import-awin.js ou le
- * workflow GitHub « Sync Awin feed »). Renvoie [] si la base est vide
- * ou injoignable — l'écran affiche alors un état vide explicite.
- */
 export async function fetchProducts(): Promise<Product[]> {
   try {
     const query = supabase.from('products').select('*').limit(500);
@@ -63,7 +64,9 @@ export async function fetchProducts(): Promise<Product[]> {
     );
     const result = await Promise.race([query, timeout]);
     if (!result || result.error || !result.data) return [];
-    return (result.data as ProductRow[]).map(rowToProduct);
+    return (result.data as ProductRow[])
+      .map(rowToProduct)
+      .filter((p): p is Product => p !== null);
   } catch {
     return [];
   }
@@ -73,19 +76,38 @@ export function matchesMorphology(product: Product, morphology: Morphology): boo
   return product.tags.includes(morphology);
 }
 
-/** Mode Pudeur : uniquement les pièces couvrantes et amples. */
 function respectsModesty(product: Product, profile: UserProfile): boolean {
   return !profile.modestMode || product.modest === true;
 }
 
-/** Flux principal : budget, pudeur, taille, morpho compatible en premier. */
-export function shoppingFeed(products: Product[], profile: UserProfile): Product[] {
+function mergeFilters(profile: UserProfile, shop?: ShopFilterState): ShopFilterState {
+  return {
+    sizes: shop?.sizes.length ? shop.sizes : profile.clothingSizes,
+    colors: shop?.colors.length ? shop.colors : profile.favoriteColors,
+  };
+}
+
+function passesFilters(product: Product, filters: ShopFilterState): boolean {
+  return (
+    matchesClothingSizes(product.sizes ?? [], filters.sizes) &&
+    matchesColors(product.colors ?? [], filters.colors)
+  );
+}
+
+/** Flux principal : vêtements uniquement, budget, pudeur, tailles/couleurs, morpho en tête. */
+export function shoppingFeed(
+  products: Product[],
+  profile: UserProfile,
+  shopFilters?: ShopFilterState,
+): Product[] {
+  const filters = mergeFilters(profile, shopFilters);
   return products
     .filter(
       (p) =>
+        p.price > 0 &&
         p.price <= profile.budget &&
         respectsModesty(p, profile) &&
-        matchesClothingSize(p.sizes ?? [], profile.clothingSize),
+        passesFilters(p, filters),
     )
     .sort((a, b) => {
       const ma = matchesMorphology(a, profile.morphology) ? 1 : 0;
@@ -95,15 +117,20 @@ export function shoppingFeed(products: Product[], profile: UserProfile): Product
     });
 }
 
-/** Ventes privées : remise ≥ 30 %, triées par compatibilité morpho puis remise décroissante. */
-export function privateSalesFeed(products: Product[], profile: UserProfile): Product[] {
+export function privateSalesFeed(
+  products: Product[],
+  profile: UserProfile,
+  shopFilters?: ShopFilterState,
+): Product[] {
+  const filters = mergeFilters(profile, shopFilters);
   return products
     .filter(
       (p) =>
         (discountPercent(p) ?? 0) >= 30 &&
+        p.price > 0 &&
         p.price <= profile.budget &&
         respectsModesty(p, profile) &&
-        matchesClothingSize(p.sizes ?? [], profile.clothingSize),
+        passesFilters(p, filters),
     )
     .sort((a, b) => {
       const ma = matchesMorphology(a, profile.morphology) ? 1 : 0;

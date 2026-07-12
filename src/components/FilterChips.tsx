@@ -14,6 +14,8 @@ interface Props<T extends string> {
   options: readonly T[];
   value: T;
   onChange: (value: T) => void;
+  label?: string;
+  horizontalPadding?: number;
 }
 
 interface ChipLayout {
@@ -25,7 +27,13 @@ interface ChipLayout {
  * Filtres animés : le chip actif se gonfle légèrement et une ligne
  * de couleur fluide glisse sous lui.
  */
-export function FilterChips<T extends string>({ options, value, onChange }: Props<T>) {
+export function FilterChips<T extends string>({
+  options,
+  value,
+  onChange,
+  label,
+  horizontalPadding = 18,
+}: Props<T>) {
   const layouts = useRef<Partial<Record<T, ChipLayout>>>({});
   const underlineX = useRef(new Animated.Value(0)).current;
   const underlineW = useRef(new Animated.Value(0)).current;
@@ -62,7 +70,9 @@ export function FilterChips<T extends string>({ options, value, onChange }: Prop
   };
 
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+    <View style={styles.wrap}>
+      {label ? <Text style={[styles.label, { paddingHorizontal: horizontalPadding }]}>{label}</Text> : null}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.row, { paddingHorizontal: horizontalPadding }]}>
       {options.map((option) => {
         const active = option === value;
         return (
@@ -86,12 +96,22 @@ export function FilterChips<T extends string>({ options, value, onChange }: Prop
         />
       )}
     </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  wrap: {
+    gap: 6,
+  },
+  label: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    color: colors.muted,
+  },
   row: {
-    paddingHorizontal: 18,
     paddingBottom: 10,
     gap: 8,
   },

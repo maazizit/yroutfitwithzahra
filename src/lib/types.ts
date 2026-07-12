@@ -19,6 +19,8 @@ export interface Product {
   modest?: boolean;
   /** Tailles disponibles (S, M, 38…) — vide si inconnu */
   sizes?: string[];
+  /** Couleurs disponibles */
+  colors?: string[];
 }
 
 export interface UserProfile {
@@ -26,6 +28,13 @@ export interface UserProfile {
   budget: number;
   /** Mode Pudeur : n'afficher que des pièces couvrantes et amples */
   modestMode: boolean;
-  /** Taille préférée — null = pas de filtre taille */
-  clothingSize: string | null;
+  /** Tailles préférées — vide = pas de filtre */
+  clothingSizes: string[];
+  /** Couleurs préférées — vide = pas de filtre */
+  favoriteColors: string[];
+}
+
+export interface ShopFilterState {
+  sizes: string[];
+  colors: string[];
 }

@@ -64,6 +64,16 @@ const CATEGORY_MAP = [
 ];
 const MODEST_PATTERN =
   /abaya|hijab|khimar|jilbab|kaftan|caftan|modest|maxi|longue|long sleeve|manches longues|tunic|tunique|palazzo|wide leg|oversized|oversize|loose|ample|cardigan long|kimono/i;
+const NON_CLOTHING =
+  /savon|soap|parfum|perfume|carte cadeau|gift\s*card|bougie|candle|cr[eè]me|cream|s[eé]rum|serum|shampo|maquillage|makeup|cosm[eé]t|lotion|dentifrice|d[eé]odorant/i;
+const CLOTHING_HINT =
+  /robe|dress|top|blouse|shirt|tee|pull|pantalon|pant|jean|jupe|skirt|short|legging|veste|jacket|coat|blazer|manteau|gilet|cardigan|abaya|hijab|tunique|combinaison|lingerie|soutien|bikini|maillot|chaussure|shoe|boot|sac\b|bag\b|ceinture|belt|écharpe|scarf|mode\b|fashion|wear|vêtement|vetement|habillement/i;
+
+function isClothingProduct(name, merchantCategory) {
+  const haystack = `${name} ${merchantCategory ?? ''}`.toLowerCase();
+  if (NON_CLOTHING.test(haystack)) return false;
+  return CLOTHING_HINT.test(haystack);
+}
 const TAG_RULES = [
   [/wrap|portefeuille|cintr|belted|ceintur|bodycon|moulant/i, ['sablier']],
   [/a-line|évasé|evase|trapèze|trapeze|flare/i, ['poire', 'triangle_inverse']],
@@ -145,6 +155,38 @@ function extractSizes(cells, sizeIdx, name, description) {
   return inferSizesFromText(`${name} ${description ?? ''}`);
 }
 
+function findColourColumn(header) {
+  for (const name of ['colour', 'color', 'fashion:colour']) {
+    const i = header.indexOf(name);
+    if (i !== -1) return i;
+  }
+  return header.findIndex((h) => h.includes('colour') || h === 'color');
+}
+
+function parseColoursCell(raw) {
+  if (!raw?.trim()) return [];
+  return [...new Set(raw.split(/[,|/;]+/).map((p) => p.trim().toLowerCase()).filter(Boolean))];
+}
+
+function inferColoursFromText(text) {
+  const lower = text.toLowerCase();
+  const ids = [];
+  const map = [
+    ['noir', 'black'], ['blanc', 'white'], ['beige', 'beige'], ['rouge', 'red'],
+    ['rose', 'pink'], ['bleu', 'blue'], ['vert', 'green'], ['violet', 'purple'], ['gris', 'grey', 'gray'],
+  ];
+  for (const keys of map) {
+    if (keys.some((k) => lower.includes(k))) ids.push(keys[0]);
+  }
+  return [...new Set(ids)];
+}
+
+function extractColours(cells, colourIdx, name, description) {
+  const fromColumn = colourIdx !== -1 ? parseColoursCell(cells[colourIdx] ?? '') : [];
+  if (fromColumn.length) return fromColumn;
+  return inferColoursFromText(`${name} ${description ?? ''}`);
+}
+
 async function main() {
   loadEnv();
   const feedUrl = process.env.AWIN_FEED_URL;
@@ -214,6 +256,7 @@ async function main() {
     category: col('merchant_category'),
   };
   const sizeIdx = findSizeColumn(header);
+  const colourIdx = findColourColumn(header);
   if (idx.id === -1 || idx.name === -1 || idx.price === -1 || idx.deeplink === -1) {
     throw new Error(`Colonnes Awin manquantes. Header: ${header.join(', ')}`);
   }
@@ -222,13 +265,14 @@ async function main() {
   for (const line of lines.slice(1)) {
     const cells = parseCsvLine(line);
     const price = parseFloat(cells[idx.price] ?? '');
-    if (!cells[idx.id] || !cells[idx.name] || Number.isNaN(price)) continue;
+    if (!cells[idx.id] || !cells[idx.name] || Number.isNaN(price) || price <= 0) continue;
+
+    const merchantCat = idx.category !== -1 ? cells[idx.category] : '';
+    const description = idx.description !== -1 ? cells[idx.description] : '';
+    if (!isClothingProduct(cells[idx.name], merchantCat)) continue;
 
     const rrp = idx.rrp !== -1 ? parseFloat(cells[idx.rrp] ?? '') : NaN;
-    const haystack = `${cells[idx.name]} ${idx.description !== -1 ? cells[idx.description] : ''} ${
-      idx.category !== -1 ? cells[idx.category] : ''
-    }`;
-    const description = idx.description !== -1 ? cells[idx.description] : '';
+    const haystack = `${cells[idx.name]} ${description} ${merchantCat}`;
 
     rows.push({
       id: `awin-${cells[idx.id]}`,
@@ -244,11 +288,16 @@ async function main() {
       category: inferCategory(haystack),
       modest: MODEST_PATTERN.test(haystack),
       sizes: extractSizes(cells, sizeIdx, cells[idx.name], description),
+      colours: extractColours(cells, colourIdx, cells[idx.name], description),
     });
     if (rows.length >= 1000) break;
   }
 
-  console.log(`${rows.length} produits parsés — insertion dans Supabase...`);
+  if (rows.length === 0) {
+    console.warn('Aucun vêtement trouvé dans ce flux — essaie un flux mode (ex. Bodycross FR dans datafeeds.csv)');
+  }
+
+  console.log(`${rows.length} vêtements parsés — insertion dans Supabase...`);
 
   const client = new Client({
     connectionString: `postgresql://postgres:${encodeURIComponent(dbPassword)}@db.${projectRef}.supabase.co:5432/postgres`,
@@ -256,21 +305,22 @@ async function main() {
   });
   await client.connect();
 
-  const cols = ['id', 'name', 'brand', 'price', 'original_price', 'currency', 'image', 'url', 'awin_mid', 'tags', 'category', 'modest', 'sizes'];
+  const cols = ['id', 'name', 'brand', 'price', 'original_price', 'currency', 'image', 'url', 'awin_mid', 'tags', 'category', 'modest', 'sizes', 'colours'];
   const values = [];
   const params = [];
   let p = 1;
   for (const row of rows) {
     values.push(
-      `($${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++})`,
+      `($${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++})`,
     );
     params.push(
       row.id, row.name, row.brand, row.price, row.original_price, row.currency,
-      row.image, row.url, row.awin_mid, row.tags, row.category, row.modest, row.sizes,
+      row.image, row.url, row.awin_mid, row.tags, row.category, row.modest, row.sizes, row.colours,
     );
   }
 
-  const sql = `
+  if (rows.length > 0) {
+    const sql = `
     INSERT INTO public.products (${cols.join(', ')})
     VALUES ${values.join(', ')}
     ON CONFLICT (id) DO UPDATE SET
@@ -286,9 +336,17 @@ async function main() {
       category = EXCLUDED.category,
       modest = EXCLUDED.modest,
       sizes = EXCLUDED.sizes,
+      colours = EXCLUDED.colours,
       updated_at = now()
   `;
-  await client.query(sql, params);
+    await client.query(sql, params);
+  }
+
+  await client.query(`
+    DELETE FROM public.products
+    WHERE name ~* 'savon|soap|carte cadeau|gift card|parfum|perfume|bougie|candle|crème|cream|sérum|serum'
+       OR price <= 0
+  `);
   await client.end();
 
   console.log(`Import terminé : ${rows.length} articles dans products`);

@@ -50,15 +50,22 @@ export function LogoMark({ size = 40 }: { size?: number }) {
   );
 }
 
-export function LogoHeader({ subtitle }: { subtitle?: string }) {
+export function LogoHeader({ subtitle, compact }: { subtitle?: string; compact?: boolean }) {
   return (
-    <View style={styles.row}>
-      <Image source={MARK} style={styles.mark} resizeMode="contain" accessibilityLabel="Logo" />
+    <View style={[styles.row, compact && styles.rowCompact]}>
+      <Image
+        source={MARK}
+        style={[styles.mark, compact && styles.markCompact]}
+        resizeMode="contain"
+        accessibilityLabel="Logo"
+      />
       <View style={styles.textBlock}>
-        <Text style={styles.wordmark}>
+        <Text style={[styles.wordmark, compact && styles.wordmarkCompact]} numberOfLines={1}>
           YourOutfit <Text style={styles.with}>with</Text> Zahra
         </Text>
-        {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+        {subtitle ? (
+          <Text style={[styles.subtitle, compact && styles.subtitleCompact]}>{subtitle}</Text>
+        ) : null}
       </View>
     </View>
   );
@@ -69,20 +76,35 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    flex: 1,
+  },
+  rowCompact: {
+    gap: 12,
   },
   mark: {
     width: 42,
     height: 42,
     borderRadius: 10,
   },
+  markCompact: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+  },
   textBlock: {
     flexDirection: 'column',
+    flex: 1,
+    minWidth: 0,
   },
   wordmark: {
     fontFamily: serif,
     fontSize: 21,
     color: colors.ink,
     letterSpacing: 0.3,
+  },
+  wordmarkCompact: {
+    fontSize: 19,
+    lineHeight: 24,
   },
   with: {
     fontStyle: 'italic',
@@ -93,6 +115,11 @@ const styles = StyleSheet.create({
     color: colors.muted,
     letterSpacing: 1.4,
     textTransform: 'uppercase',
-    marginTop: 1,
+    marginTop: 2,
+  },
+  subtitleCompact: {
+    fontSize: 10,
+    letterSpacing: 1.8,
+    marginTop: 3,
   },
 });

@@ -1,11 +1,11 @@
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
   Pressable,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -15,12 +15,15 @@ import { FadeInView } from '@/components/anim';
 import { FilterChips } from '@/components/FilterChips';
 import { LogoHeader } from '@/components/Logo';
 import { ProductCard } from '@/components/ProductCard';
+import { ShopFilterBar } from '@/components/ShopFilterBar';
+import { colorsSummary } from '@/lib/colors';
 import { morphologyLabel } from '@/lib/morphology';
-import { sizeLabel } from '@/lib/sizes';
 import { fetchProducts, shoppingFeed } from '@/lib/products';
 import { useProfile } from '@/lib/profile';
-import type { Category, Product } from '@/lib/types';
-import { colors, radius, serif } from '@/theme';
+import { useResponsiveLayout } from '@/lib/layout';
+import { sizesSummary } from '@/lib/sizes';
+import type { Category, ShopFilterState } from '@/lib/types';
+import { colors, radius, serif, shadow } from '@/theme';
 
 const CATEGORY_FILTERS: Array<Category | 'Tous'> = [
   'Tous',
@@ -34,14 +37,15 @@ const CATEGORY_FILTERS: Array<Category | 'Tous'> = [
 export default function ShopScreen() {
   const router = useRouter();
   const { profile } = useProfile();
-  const [products, setProducts] = useState<Product[]>([]);
+  const { contentWidth, pagePadding } = useResponsiveLayout();
+  const [products, setProducts] = useState<Awaited<ReturnType<typeof fetchProducts>>>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [category, setCategory] = useState<Category | 'Tous'>('Tous');
+  const [shopFilters, setShopFilters] = useState<ShopFilterState>({ sizes: [], colors: [] });
 
   const load = useCallback(async () => {
-    const all = await fetchProducts();
-    setProducts(all);
+    setProducts(await fetchProducts());
   }, []);
 
   useEffect(() => {
@@ -56,9 +60,9 @@ export default function ShopScreen() {
 
   const feed = useMemo(() => {
     if (!profile) return [];
-    const base = shoppingFeed(products, profile);
+    const base = shoppingFeed(products, profile, shopFilters);
     return category === 'Tous' ? base : base.filter((p) => p.category === category);
-  }, [products, profile, category]);
+  }, [products, profile, category, shopFilters]);
 
   if (!profile) {
     return (
@@ -73,42 +77,72 @@ export default function ShopScreen() {
     );
   }
 
+  const hasActiveShopFilters = shopFilters.sizes.length > 0 || shopFilters.colors.length > 0;
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}>
-        <LogoHeader subtitle="Sublime ta forme" />
-        <Pressable
-          style={styles.profilePill}
-          onPress={() => router.push('/(tabs)/profile')}
-          accessibilityRole="button"
-          accessibilityLabel="Modifier ma silhouette et mon budget"
-        >
-          <Text style={styles.profilePillText}>
-            {profile.modestMode ? '🧕 ' : ''}
-            {morphologyLabel(profile.morphology)}
-            {profile.clothingSize ? ` · ${profile.clothingSize}` : ''} · ≤ {profile.budget} € ›
-          </Text>
-        </Pressable>
-      </View>
+      <FadeInView delay={0} dy={6}>
+        <View style={[styles.headerCard, { marginHorizontal: pagePadding, maxWidth: contentWidth, alignSelf: 'center', width: '100%' }]}>
+          <LinearGradient
+            colors={[colors.ivory, colors.goldSoft]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.headerGradient}
+          >
+            <LogoHeader compact subtitle="Sublime ta forme" />
 
-      <FadeInView delay={80} dy={8}>
-        <View style={styles.editorial}>
-          <View style={styles.editorialLine} />
-          <Text style={styles.editorialText}>
-            La sélection{' '}
-            <Text style={styles.editorialAccent}>
-              {profile.modestMode ? 'Pudeur 🧕 · ' : ''}
-              {morphologyLabel(profile.morphology)}
-              {profile.clothingSize ? ` · ${sizeLabel(profile.clothingSize)}` : ''}
-            </Text>
-          </Text>
-          <View style={styles.editorialLine} />
+            <Pressable
+              style={styles.profileRow}
+              onPress={() => router.push('/(tabs)/profile')}
+              accessibilityRole="button"
+            >
+              <View style={styles.profileInfo}>
+                <Text style={styles.profileLabel}>Mon style</Text>
+                <Text style={styles.profileValue} numberOfLines={1}>
+                  {profile.modestMode ? '🧕 ' : ''}
+                  {morphologyLabel(profile.morphology)} · ≤ {profile.budget} €
+                </Text>
+              </View>
+              <Text style={styles.profileChevron}>›</Text>
+            </Pressable>
+
+            <View style={styles.selectionCard}>
+              <View style={styles.selectionText}>
+                <Text style={styles.selectionEyebrow}>Ta sélection</Text>
+                <Text style={styles.selectionTitle}>{morphologyLabel(profile.morphology)}</Text>
+              </View>
+              <View style={styles.countBadge}>
+                <Text style={styles.countNum}>{feed.length}</Text>
+                <Text style={styles.countLabel}>pièce{feed.length !== 1 ? 's' : ''}</Text>
+              </View>
+            </View>
+          </LinearGradient>
         </View>
       </FadeInView>
 
+      <ShopFilterBar
+        sizes={shopFilters.sizes}
+        colors={shopFilters.colors}
+        onChangeSizes={(sizes) => setShopFilters((f) => ({ ...f, sizes }))}
+        onChangeColors={(colors) => setShopFilters((f) => ({ ...f, colors: colors }))}
+      />
+
       <View style={styles.filtersWrap}>
-        <FilterChips options={CATEGORY_FILTERS} value={category} onChange={setCategory} />
+        <FilterChips
+          label="Catégories"
+          options={CATEGORY_FILTERS}
+          value={category}
+          onChange={setCategory}
+          horizontalPadding={pagePadding}
+        />
       </View>
+
+      {!hasActiveShopFilters &&
+        (profile.clothingSizes.length > 0 || profile.favoriteColors.length > 0) && (
+          <Text style={styles.profileHint}>
+            Profil : {sizesSummary(profile.clothingSizes)} · {colorsSummary(profile.favoriteColors)}
+          </Text>
+        )}
 
       {loading ? (
         <View style={styles.center}>
@@ -120,7 +154,7 @@ export default function ShopScreen() {
           keyExtractor={(item) => item.id}
           numColumns={2}
           columnWrapperStyle={styles.column}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[styles.list, { paddingHorizontal: pagePadding }]}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />
           }
@@ -131,11 +165,20 @@ export default function ShopScreen() {
           )}
           ListEmptyComponent={
             <View style={styles.center}>
+              <Text style={styles.emptyTitle}>Aucun vêtement trouvé</Text>
               <Text style={styles.emptyText}>
                 {products.length === 0
-                  ? 'Ton catalogue se connecte aux marques ✨\nLance l’import Awin (workflow « Sync Awin feed » sur GitHub ou `node scripts/import-awin.js`), puis tire pour rafraîchir.'
-                  : 'Aucun article dans ce budget pour l’instant.\nAjuste ton budget ou ta taille dans « Mon style ».'}
+                  ? 'Importe un flux mode Awin (Bodycross, lingerie…), puis tire pour rafraîchir.'
+                  : 'Essaye « Effacer » les filtres, change de catégorie, ou augmente ton budget dans Mon style.'}
               </Text>
+              {hasActiveShopFilters && (
+                <Pressable
+                  style={styles.emptyCta}
+                  onPress={() => setShopFilters({ sizes: [], colors: [] })}
+                >
+                  <Text style={styles.emptyCtaText}>Effacer mes filtres</Text>
+                </Pressable>
+              )}
             </View>
           }
         />
@@ -145,110 +188,143 @@ export default function ShopScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: colors.ivory,
+  safe: { flex: 1, backgroundColor: colors.ivory },
+  headerCard: {
+    marginTop: 6,
+    marginBottom: 2,
+    borderRadius: radius.lg,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadow.float,
   },
-  header: {
-    paddingHorizontal: 18,
-    paddingTop: 10,
-    paddingBottom: 4,
+  headerGradient: {
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 12,
+    gap: 10,
+  },
+  profileRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    backgroundColor: colors.card,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
   },
-  profilePill: {
-    backgroundColor: colors.goldSoft,
-    borderRadius: radius.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+  profileInfo: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
   },
-  profilePillText: {
-    fontSize: 11.5,
+  profileLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    color: colors.faint,
+  },
+  profileValue: {
+    fontSize: 14,
     fontWeight: '600',
     color: colors.ink,
   },
-  editorial: {
+  profileChevron: {
+    fontSize: 22,
+    color: colors.accent,
+    marginLeft: 8,
+    lineHeight: 24,
+  },
+  selectionCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 18,
-    marginTop: 12,
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255,255,255,0.72)',
+    borderRadius: radius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: colors.goldSoft,
   },
-  editorialLine: {
+  selectionText: {
     flex: 1,
-    height: 1,
-    backgroundColor: colors.goldSoft,
+    gap: 2,
   },
-  editorialText: {
+  selectionEyebrow: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    color: colors.muted,
+  },
+  selectionTitle: {
     fontFamily: serif,
     fontStyle: 'italic',
-    fontSize: 15,
-    color: colors.muted,
+    fontSize: 18,
+    color: colors.ink,
+    lineHeight: 24,
   },
-  editorialAccent: {
-    color: colors.accent,
-  },
-  cardSlot: {
-    flex: 1,
-  },
-  filtersWrap: {
-    marginTop: 10,
-  },
-  filters: {
-    paddingHorizontal: 18,
-    gap: 8,
-  },
-  chip: {
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
-    paddingHorizontal: 15,
+  countBadge: {
+    alignItems: 'center',
+    backgroundColor: colors.goldSoft,
+    borderRadius: radius.md,
+    paddingHorizontal: 14,
     paddingVertical: 8,
+    minWidth: 64,
   },
-  chipActive: {
-    backgroundColor: colors.ink,
-    borderColor: colors.ink,
+  countNum: {
+    fontFamily: serif,
+    fontSize: 22,
+    color: colors.ink,
+    lineHeight: 26,
   },
-  chipText: {
-    fontSize: 13,
+  countLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
     color: colors.muted,
-    fontWeight: '500',
   },
-  chipTextActive: {
-    color: colors.white,
+  filtersWrap: { marginTop: 2 },
+  profileHint: {
+    fontSize: 11.5,
+    color: colors.faint,
+    textAlign: 'center',
+    marginBottom: 4,
+    fontStyle: 'italic',
   },
-  list: {
-    padding: 14,
-    gap: 14,
-    paddingBottom: 30,
-  },
-  column: {
-    gap: 14,
-  },
+  cardSlot: { flex: 1 },
+  list: { paddingTop: 14, gap: 14, paddingBottom: 30 },
+  column: { gap: 14 },
   center: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 30,
-    gap: 14,
+    gap: 12,
+  },
+  emptyTitle: {
+    fontFamily: serif,
+    fontSize: 20,
+    color: colors.ink,
+    textAlign: 'center',
   },
   emptyText: {
     fontFamily: serif,
-    fontSize: 16,
+    fontSize: 15,
     color: colors.muted,
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 22,
   },
   emptyCta: {
     backgroundColor: colors.ink,
     borderRadius: radius.pill,
     paddingHorizontal: 24,
     paddingVertical: 12,
+    marginTop: 8,
   },
-  emptyCtaText: {
-    color: colors.white,
-    fontWeight: '600',
-  },
+  emptyCtaText: { color: colors.white, fontWeight: '600' },
 });
