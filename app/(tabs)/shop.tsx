@@ -86,7 +86,11 @@ export default function ShopScreen() {
         <View style={styles.editorial}>
           <View style={styles.editorialLine} />
           <Text style={styles.editorialText}>
-            La sélection <Text style={styles.editorialAccent}>{morphologyLabel(profile.morphology)}</Text>
+            La sélection{' '}
+            <Text style={styles.editorialAccent}>
+              {profile.modestMode ? 'Pudeur 🧕 · ' : ''}
+              {morphologyLabel(profile.morphology)}
+            </Text>
           </Text>
           <View style={styles.editorialLine} />
         </View>

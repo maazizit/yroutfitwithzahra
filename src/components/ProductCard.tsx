@@ -63,6 +63,12 @@ export function ProductCard({ product, userMorphology }: Props) {
           </View>
         )}
 
+        {product.modest && (
+          <View style={[styles.modestBadge, discount !== null && styles.modestBadgeShifted]}>
+            <Text style={styles.modestText}>🧕 Pudique</Text>
+          </View>
+        )}
+
         <Pressable
           onPress={() => setLiked((v) => !v)}
           hitSlop={10}
@@ -159,6 +165,25 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 12,
     fontWeight: '700',
+  },
+  modestBadge: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    backgroundColor: colors.sageSoft,
+    borderWidth: 1,
+    borderColor: colors.sage,
+    borderRadius: radius.pill,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  modestBadgeShifted: {
+    top: 38,
+  },
+  modestText: {
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: '#4E6147',
   },
   heartButton: {
     position: 'absolute',

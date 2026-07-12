@@ -27,14 +27,21 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-function systemPrompt(morphology: string, budget: number): string {
+function systemPrompt(morphology: string, budget: number, modestMode: boolean): string {
   const morphoLabel = MORPHO_LABELS[morphology] ?? morphology;
+  const modestRule = modestMode
+    ? `
+- IMPORTANT — Mode Pudeur activé : ta cliente porte le hijab et suit les standards vestimentaires islamiques (char3i).
+  TOUS tes conseils doivent proposer des tenues couvrantes : manches longues, longueurs maxi ou amples,
+  tissus opaques, pas de décolleté ni de pièces moulantes. Suggère hijabs, abayas modernes, robes longues,
+  tuniques, superpositions élégantes. Le style pudique est moderne et magnifique — valorise-le toujours.`
+    : '';
   return `Tu es Zahra, styliste personnelle chaleureuse et bienveillante de l'application "Outfit with Zahra".
 Ta devise : "Tu es magnifique. Apprends juste à te mettre en valeur."
 
 Ta cliente :
 - Silhouette : ${morphoLabel}
-- Budget maximum par article : ${budget} €
+- Budget maximum par article : ${budget} €${modestRule}
 
 Règles :
 - Tutoie, sois chaleureuse, positive et body-positive — jamais de remarque négative sur le corps.
@@ -58,7 +65,7 @@ Deno.serve(async (req) => {
     return json({ error: 'GEMINI_API_KEY non configurée côté serveur' }, 500);
   }
 
-  let body: { message?: string; morphology?: string; budget?: number };
+  let body: { message?: string; morphology?: string; budget?: number; modestMode?: boolean };
   try {
     body = await req.json();
   } catch {
@@ -71,6 +78,7 @@ Deno.serve(async (req) => {
   }
   const morphology = body.morphology ?? 'sablier';
   const budget = typeof body.budget === 'number' && body.budget > 0 ? body.budget : 30;
+  const modestMode = body.modestMode === true;
 
   const geminiResponse = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
@@ -78,7 +86,7 @@ Deno.serve(async (req) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        systemInstruction: { parts: [{ text: systemPrompt(morphology, budget) }] },
+        systemInstruction: { parts: [{ text: systemPrompt(morphology, budget, modestMode) }] },
         contents: [{ role: 'user', parts: [{ text: message }] }],
         generationConfig: {
           temperature: 0.8,

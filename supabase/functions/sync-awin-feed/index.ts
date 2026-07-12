@@ -19,6 +19,10 @@ const CATEGORY_MAP: Array<[RegExp, string]> = [
   [/belt|bag|scarf|ceinture|sac|bijou|accessor/i, 'Accessoires'],
 ];
 
+/** Pièces compatibles Mode Pudeur (char3i) : couvrantes, amples, maxi. */
+const MODEST_PATTERN =
+  /abaya|hijab|khimar|jilbab|kaftan|caftan|modest|maxi|longue|long sleeve|manches longues|tunic|tunique|palazzo|wide leg|oversized|oversize|loose|ample|cardigan long|kimono/i;
+
 /** Heuristique de tagging morpho par mots-clés — affinée ensuite par Gemini (tag-morphology). */
 const TAG_RULES: Array<[RegExp, string[]]> = [
   [/wrap|portefeuille|cintr|belted|ceintur|bodycon|moulant/i, ['sablier']],
@@ -145,6 +149,7 @@ Deno.serve(async (req) => {
       awin_mid: idx.merchantId !== -1 ? cells[idx.merchantId] : null,
       tags: inferTags(haystack),
       category: inferCategory(haystack),
+      modest: MODEST_PATTERN.test(haystack),
     });
     if (rows.length >= 1000) break; // garde-fou tier gratuit
   }

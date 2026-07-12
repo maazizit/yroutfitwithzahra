@@ -15,9 +15,13 @@ export interface Product {
   awinMid?: string;
   tags: Morphology[];
   category: Category;
+  /** Convient au mode pudeur (char3i) : couvrant, ample, opaque */
+  modest?: boolean;
 }
 
 export interface UserProfile {
   morphology: Morphology;
   budget: number;
+  /** Mode Pudeur : n'afficher que des pièces couvrantes et amples */
+  modestMode: boolean;
 }

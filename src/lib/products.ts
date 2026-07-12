@@ -19,6 +19,7 @@ interface ProductRow {
   awin_mid: string | null;
   tags: string[] | null;
   category: string | null;
+  modest: boolean | null;
 }
 
 function rowToProduct(row: ProductRow): Product {
@@ -40,6 +41,7 @@ function rowToProduct(row: ProductRow): Product {
     awinMid: row.awin_mid ?? undefined,
     tags,
     category,
+    modest: row.modest === true,
   };
 }
 
@@ -71,10 +73,15 @@ export function matchesMorphology(product: Product, morphology: Morphology): boo
   return product.tags.includes(morphology);
 }
 
+/** Mode Pudeur : uniquement les pièces couvrantes et amples. */
+function respectsModesty(product: Product, profile: UserProfile): boolean {
+  return !profile.modestMode || product.modest === true;
+}
+
 /** Flux principal : dans le budget, articles compatibles morpho en premier, puis prix croissant. */
 export function shoppingFeed(products: Product[], profile: UserProfile): Product[] {
   return products
-    .filter((p) => p.price <= profile.budget)
+    .filter((p) => p.price <= profile.budget && respectsModesty(p, profile))
     .sort((a, b) => {
       const ma = matchesMorphology(a, profile.morphology) ? 1 : 0;
       const mb = matchesMorphology(b, profile.morphology) ? 1 : 0;
@@ -86,7 +93,10 @@ export function shoppingFeed(products: Product[], profile: UserProfile): Product
 /** Ventes privées : remise ≥ 30 %, triées par compatibilité morpho puis remise décroissante. */
 export function privateSalesFeed(products: Product[], profile: UserProfile): Product[] {
   return products
-    .filter((p) => (discountPercent(p) ?? 0) >= 30 && p.price <= profile.budget)
+    .filter(
+      (p) =>
+        (discountPercent(p) ?? 0) >= 30 && p.price <= profile.budget && respectsModesty(p, profile),
+    )
     .sort((a, b) => {
       const ma = matchesMorphology(a, profile.morphology) ? 1 : 0;
       const mb = matchesMorphology(b, profile.morphology) ? 1 : 0;

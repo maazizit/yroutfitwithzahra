@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
+import { useRouter } from 'expo-router';
 import {
   ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -19,9 +21,11 @@ import { useProfile } from '@/lib/profile';
 import { colors, radius, serif } from '@/theme';
 
 export default function ProfileScreen() {
-  const { profile, saveProfile } = useProfile();
+  const router = useRouter();
+  const { profile, saveProfile, resetProfile } = useProfile();
   const [morphology, setMorphology] = useState<Morphology | null>(profile?.morphology ?? null);
   const [budget, setBudget] = useState(profile?.budget ?? 30);
+  const [modestMode, setModestMode] = useState(profile?.modestMode ?? false);
   const [saved, setSaved] = useState(false);
 
   const [aiInput, setAiInput] = useState('');
@@ -31,9 +35,14 @@ export default function ProfileScreen() {
 
   const save = async () => {
     if (!morphology) return;
-    await saveProfile({ morphology, budget });
+    await saveProfile({ morphology, budget, modestMode });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  };
+
+  const restartOnboarding = async () => {
+    await resetProfile();
+    router.replace('/onboarding');
   };
 
   const analyze = async () => {
@@ -77,6 +86,24 @@ export default function ProfileScreen() {
         <Text style={styles.sectionTitle}>Mon budget</Text>
         <View style={styles.card}>
           <BudgetSlider value={budget} onChange={setBudget} />
+        </View>
+
+        <Text style={styles.sectionTitle}>Mode Pudeur 🧕</Text>
+        <View style={[styles.card, styles.modestCard]}>
+          <View style={styles.modestTextBlock}>
+            <Text style={styles.modestTitle}>Looks char3i uniquement</Text>
+            <Text style={styles.modestSubtitle}>
+              Pièces couvrantes, amples et élégantes — hijabs, abayas modernes, robes longues,
+              tuniques. La pudeur avec style.
+            </Text>
+          </View>
+          <Switch
+            value={modestMode}
+            onValueChange={setModestMode}
+            trackColor={{ false: colors.border, true: colors.sage }}
+            thumbColor={colors.white}
+            accessibilityLabel="Activer le Mode Pudeur"
+          />
         </View>
 
         <Pressable
@@ -156,6 +183,10 @@ export default function ProfileScreen() {
             </View>
           )}
         </View>
+
+        <Pressable onPress={restartOnboarding} style={styles.restartLink}>
+          <Text style={styles.restartText}>↺  Refaire l'onboarding (silhouette & budget)</Text>
+        </Pressable>
 
         <Text style={styles.footerSlogan}>
           "You're gorgeous. Just learn how to embrace your shape."
@@ -282,12 +313,44 @@ const styles = StyleSheet.create({
   aiTagTextMine: {
     color: colors.white,
   },
+  modestCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: colors.sageSoft,
+    borderColor: colors.sage,
+  },
+  modestTextBlock: {
+    flex: 1,
+    gap: 3,
+  },
+  modestTitle: {
+    fontFamily: serif,
+    fontSize: 16,
+    color: colors.ink,
+  },
+  modestSubtitle: {
+    fontSize: 12.5,
+    color: colors.muted,
+    lineHeight: 17,
+  },
+  restartLink: {
+    alignSelf: 'center',
+    marginTop: 24,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  restartText: {
+    fontSize: 13.5,
+    color: colors.accentDark,
+    fontWeight: '500',
+  },
   footerSlogan: {
     fontFamily: serif,
     fontStyle: 'italic',
     fontSize: 13.5,
     color: colors.faint,
     textAlign: 'center',
-    marginTop: 28,
+    marginTop: 12,
   },
 });

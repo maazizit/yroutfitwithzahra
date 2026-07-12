@@ -37,7 +37,11 @@ function parseProfile(raw: string | null): UserProfile | null {
       typeof parsed.morphology === 'string' &&
       (ALL_MORPHOLOGIES as string[]).includes(parsed.morphology)
     ) {
-      return { morphology: parsed.morphology, budget: parsed.budget } as UserProfile;
+      return {
+        morphology: parsed.morphology,
+        budget: parsed.budget,
+        modestMode: parsed.modestMode === true,
+      } as UserProfile;
     }
     return null;
   } catch {

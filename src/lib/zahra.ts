@@ -9,6 +9,7 @@ export interface ZahraMessage {
 }
 
 export const QUICK_PROMPTS = [
+  '🧕 Un look pudique stylé',
   '💼 Tenue pour un entretien',
   '💃 Look de soirée',
   '💍 Invitée à un mariage',
@@ -39,6 +40,7 @@ export async function askZahra(message: string, profile: UserProfile): Promise<s
         message,
         morphology: profile.morphology,
         budget: profile.budget,
+        modestMode: profile.modestMode,
       }),
       signal: controller.signal,
     });
@@ -58,6 +60,11 @@ export async function askZahra(message: string, profile: UserProfile): Promise<s
 interface Topic {
   patterns: RegExp;
   build: (profile: UserProfile) => string;
+}
+
+function modestLine(profile: UserProfile): string {
+  if (!profile.modestMode) return '';
+  return `\n\nVersion pudeur 🧕 : privilégie les manches longues, les coupes amples et les longueurs maxi, avec des tissus opaques — et assortis ton hijab à la pièce principale pour un look harmonieux.`;
 }
 
 function budgetLine(profile: UserProfile): string {
@@ -93,29 +100,34 @@ const MORPHO_ROBE: Record<string, string> = {
 
 const TOPICS: Topic[] = [
   {
+    patterns: /hijab|voile|char3i|charii|char'i|pudeur|pudique|abaya|modest|halal|couvrant|jilbab|khimar/i,
+    build: (p) =>
+      `Le style pudique, c'est mon domaine préféré 🧕✨\n\n• La base : coupes amples, longueurs maxi, tissus opaques — la pudeur n'enlève RIEN au style\n• Une abaya kimono moderne ou une robe longue chemisier : élégance instantanée\n• Le hijab : mousseline ou jersey premium, dans un ton assorti à ta pièce principale (camaïeu = effet luxe)\n• Superpose : tunique longue + pantalon fluide + cardigan maxi = silhouette harmonieuse\n\nPour ta silhouette ${morphologyLabel(p.morphology)}, joue avec les superpositions plutôt que les coupes près du corps : une ceinture par-dessus une robe ample dessine la ligne tout en restant couvrante.\n\n${budgetLine(p)}\n\nActive le Mode Pudeur 🧕 dans « Mon style » pour ne voir que des pièces char3i dans ton feed ✨`,
+  },
+  {
     patterns: /entretien|travail|bureau|boulot|job|pro|réunion|reunion|stage/i,
     build: (p) =>
-      `Pour un entretien, mise sur la confiance ✨\n\n• Un blazer bien coupé (marine ou noir) — la pièce qui change tout\n• Un haut uni clair, pantalon droit ou jupe midi\n• Une seule touche de couleur ou un bijou fin, pas plus\n\nPour ta silhouette ${morphologyLabel(p.morphology)} :\n${morphoLines(p)}\n\n${budgetLine(p)}\n\nEt surtout : tu es magnifique, tiens-toi droite et souris 💛`,
+      `Pour un entretien, mise sur la confiance ✨\n\n• Un blazer bien coupé (marine ou noir) — la pièce qui change tout\n• Un haut uni clair, pantalon droit ou jupe midi\n• Une seule touche de couleur ou un bijou fin, pas plus\n\nPour ta silhouette ${morphologyLabel(p.morphology)} :\n${morphoLines(p)}${modestLine(p)}\n\n${budgetLine(p)}\n\nEt surtout : tu es magnifique, tiens-toi droite et souris 💛`,
   },
   {
     patterns: /mariage|cérémonie|ceremonie|invitée|invitee|fiançailles|fiancailles|henné|henne/i,
     build: (p) =>
-      `Invitée à un mariage, quel bonheur ! 💍\n\n• Une robe midi ou longue dans une couleur riche (terracotta, émeraude, bleu nuit)\n• Évite le blanc (réservé à la mariée !) et le noir total\n• Talons confortables — tu vas danser 💃\n\nPour ta silhouette ${morphologyLabel(p.morphology)}, ${MORPHO_ROBE[p.morphology]}\n\n${budgetLine(p)}`,
+      `Invitée à un mariage, quel bonheur ! 💍\n\n• Une robe midi ou longue dans une couleur riche (terracotta, émeraude, bleu nuit)\n• Évite le blanc (réservé à la mariée !) et le noir total\n• Talons confortables — tu vas danser 💃\n\nPour ta silhouette ${morphologyLabel(p.morphology)}, ${MORPHO_ROBE[p.morphology]}${modestLine(p)}\n\n${budgetLine(p)}`,
   },
   {
     patterns: /soirée|soiree|date|resto|restaurant|rendez-vous|sortie|club|anniversaire/i,
     build: (p) =>
-      `Look de soirée — on sort le grand jeu ✨\n\n• Une pièce statement : robe satinée, top à sequins discrets ou blazer porté épaules nues\n• Le reste sobre pour laisser la pièce forte briller\n• Rouge à lèvres terracotta et c'est gagné 💄\n\nPour ta silhouette ${morphologyLabel(p.morphology)}, ${MORPHO_ROBE[p.morphology]}\n\n${budgetLine(p)}`,
+      `Look de soirée — on sort le grand jeu ✨\n\n• Une pièce statement : robe satinée, top à sequins discrets ou blazer porté épaules nues\n• Le reste sobre pour laisser la pièce forte briller\n• Rouge à lèvres terracotta et c'est gagné 💄\n\nPour ta silhouette ${morphologyLabel(p.morphology)}, ${MORPHO_ROBE[p.morphology]}${modestLine(p)}\n\n${budgetLine(p)}`,
   },
   {
     patterns: /été|ete|plage|vacances|chaleur|chaud|soleil|piscine/i,
     build: (p) =>
-      `Tenue d'été légère et stylée ☀️\n\n• Matières naturelles : lin, coton, viscose fluide\n• Couleurs claires ou imprimés fins — plus frais et plus chic\n• Robe longue fluide + sandales plates = combo gagnant\n\nPour ta silhouette ${morphologyLabel(p.morphology)} :\n${morphoLines(p)}\n\n${budgetLine(p)}`,
+      `Tenue d'été légère et stylée ☀️\n\n• Matières naturelles : lin, coton, viscose fluide\n• Couleurs claires ou imprimés fins — plus frais et plus chic\n• Robe longue fluide + sandales plates = combo gagnant\n\nPour ta silhouette ${morphologyLabel(p.morphology)} :\n${morphoLines(p)}${modestLine(p)}\n\n${budgetLine(p)}`,
   },
   {
     patterns: /hiver|froid|manteau|pluie|automne/i,
     build: (p) =>
-      `Pour l'hiver, on superpose avec style ❄️\n\n• Un manteau long ligne droite — il élève n'importe quelle tenue\n• Col roulé fin + pantalon fluide : chic sans effort\n• Camel, gris perle et bordeaux : le trio qui réchauffe\n\nPour ta silhouette ${morphologyLabel(p.morphology)} :\n${morphoLines(p)}\n\n${budgetLine(p)}`,
+      `Pour l'hiver, on superpose avec style ❄️\n\n• Un manteau long ligne droite — il élève n'importe quelle tenue\n• Col roulé fin + pantalon fluide : chic sans effort\n• Camel, gris perle et bordeaux : le trio qui réchauffe\n\nPour ta silhouette ${morphologyLabel(p.morphology)} :\n${morphoLines(p)}${modestLine(p)}\n\n${budgetLine(p)}`,
   },
   {
     patterns: /couleur|palette|teinte|coloris/i,
@@ -125,12 +137,12 @@ const TOPICS: Topic[] = [
   {
     patterns: /jean|pantalon|denim/i,
     build: (p) =>
-      `Le bon jean change une silhouette 👖\n\nPour toi, silhouette ${morphologyLabel(p.morphology)} : ${MORPHO_JEAN[p.morphology]}\n\n• Toujours l'essayer assis ET debout\n• L'ourlet doit effleurer la chaussure\n\n${budgetLine(p)}`,
+      `Le bon jean change une silhouette 👖\n\nPour toi, silhouette ${morphologyLabel(p.morphology)} : ${MORPHO_JEAN[p.morphology]}${modestLine(p)}\n\n• Toujours l'essayer assis ET debout\n• L'ourlet doit effleurer la chaussure\n\n${budgetLine(p)}`,
   },
   {
     patterns: /robe/i,
     build: (p) =>
-      `La robe parfaite existe, promis 👗\n\nPour ta silhouette ${morphologyLabel(p.morphology)}, ${MORPHO_ROBE[p.morphology]}\n\n${budgetLine(p)}\n\nVa voir l'onglet « Pour toi », j'ai filtré des robes à ta silhouette ✨`,
+      `La robe parfaite existe, promis 👗\n\nPour ta silhouette ${morphologyLabel(p.morphology)}, ${MORPHO_ROBE[p.morphology]}${modestLine(p)}\n\n${budgetLine(p)}\n\nVa voir l'onglet « Pour toi », j'ai filtré des robes à ta silhouette ✨`,
   },
   {
     patterns: /bonjour|salut|salam|hello|coucou|cc|hey/i,
@@ -143,13 +155,16 @@ export function localAdvice(message: string, profile: UserProfile): string {
   for (const topic of TOPICS) {
     if (topic.patterns.test(message)) return topic.build(profile);
   }
-  return `Très bonne question 💭\n\nVoici mes essentiels pour ta silhouette ${morphologyLabel(profile.morphology)} :\n${morphoLines(profile)}\n\n${budgetLine(profile)}\n\nTu peux aussi me demander : une tenue d'entretien, de mariage, de soirée, quelles couleurs te vont, ou quel jean choisir ✨`;
+  return `Très bonne question 💭\n\nVoici mes essentiels pour ta silhouette ${morphologyLabel(profile.morphology)} :\n${morphoLines(profile)}${modestLine(profile)}\n\n${budgetLine(profile)}\n\nTu peux aussi me demander : une tenue d'entretien, de mariage, de soirée, quelles couleurs te vont, ou quel jean choisir ✨`;
 }
 
 export function welcomeMessage(profile: UserProfile): ZahraMessage {
+  const modestNote = profile.modestMode
+    ? ' Mode Pudeur activé 🧕 — tous mes conseils respecteront le style char3i.'
+    : '';
   return {
     id: 'welcome',
     role: 'zahra',
-    text: `Bienvenue dans mon salon de style 🌸\n\nJe suis Zahra. Silhouette ${morphologyLabel(profile.morphology)}, budget ${profile.budget} € — j'ai déjà tout en tête.\n\nDis-moi pour quelle occasion tu veux briller, ou choisis une question ci-dessous 👇`,
+    text: `Bienvenue dans mon salon de style 🌸\n\nJe suis Zahra. Silhouette ${morphologyLabel(profile.morphology)}, budget ${profile.budget} € — j'ai déjà tout en tête.${modestNote}\n\nDis-moi pour quelle occasion tu veux briller, ou choisis une question ci-dessous 👇`,
   };
 }

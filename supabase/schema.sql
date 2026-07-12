@@ -12,8 +12,12 @@ create table if not exists public.products (
   awin_mid text,
   tags text[] not null default '{}',
   category text not null default 'Hauts',
+  modest boolean not null default false,
   updated_at timestamptz not null default now()
 );
+
+-- Si la table existe déjà sans la colonne (migration) :
+alter table public.products add column if not exists modest boolean not null default false;
 
 create index if not exists products_price_idx on public.products (price);
 create index if not exists products_tags_idx on public.products using gin (tags);

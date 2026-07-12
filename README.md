@@ -13,7 +13,8 @@ d'achat affilié.
 
 **Lot 1 — MVP**
 - Onboarding : sélection visuelle de la morphologie (Sablier, Poire, Pomme, Rectangle,
-  Triangle inversé) + curseur de budget max.
+  Triangle inversé) + curseur de budget max + **Mode Pudeur 🧕** (looks char3i :
+  pièces couvrantes, amples et élégantes — hijabs, abayas modernes, robes longues).
 - Flux shopping : grille élégante (photo, marque, prix, badge « Idéal pour Silhouette … »),
   bouton **Acheter** → lien d'affiliation Awin.
 - Filtres par catégorie (Robes, Hauts, Bas, Vestes, Accessoires).

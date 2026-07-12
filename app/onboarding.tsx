@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FadeInView, PulseView, ScalePressable } from '@/components/anim';
 import { BudgetSlider } from '@/components/BudgetSlider';
@@ -17,6 +17,7 @@ export default function Onboarding() {
   const [step, setStep] = useState<1 | 2>(1);
   const [morphology, setMorphology] = useState<Morphology | null>(null);
   const [budget, setBudget] = useState(30);
+  const [modestMode, setModestMode] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const next = async () => {
@@ -27,7 +28,7 @@ export default function Onboarding() {
     if (!morphology || saving) return;
     setSaving(true);
     try {
-      await saveProfile({ morphology, budget });
+      await saveProfile({ morphology, budget, modestMode });
       router.replace('/(tabs)/shop');
     } finally {
       setSaving(false);
@@ -80,6 +81,25 @@ export default function Onboarding() {
             <FadeInView delay={120}>
               <View style={styles.budgetCard}>
                 <BudgetSlider value={budget} onChange={setBudget} />
+              </View>
+            </FadeInView>
+            <FadeInView delay={240}>
+              <View style={styles.modestCard}>
+                <Text style={styles.modestEmoji}>🧕</Text>
+                <View style={styles.modestTextBlock}>
+                  <Text style={styles.modestTitle}>Mode Pudeur</Text>
+                  <Text style={styles.modestSubtitle}>
+                    Uniquement des looks char3i : couvrants, amples et élégants — la pudeur avec
+                    style.
+                  </Text>
+                </View>
+                <Switch
+                  value={modestMode}
+                  onValueChange={setModestMode}
+                  trackColor={{ false: colors.border, true: colors.sage }}
+                  thumbColor={colors.white}
+                  accessibilityLabel="Activer le Mode Pudeur"
+                />
               </View>
             </FadeInView>
           </View>
@@ -197,6 +217,34 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     paddingVertical: 28,
     paddingHorizontal: 20,
+  },
+  modestCard: {
+    marginTop: 14,
+    backgroundColor: colors.sageSoft,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.sage,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  modestEmoji: {
+    fontSize: 26,
+  },
+  modestTextBlock: {
+    flex: 1,
+    gap: 3,
+  },
+  modestTitle: {
+    fontFamily: serif,
+    fontSize: 17,
+    color: colors.ink,
+  },
+  modestSubtitle: {
+    fontSize: 12.5,
+    color: colors.muted,
+    lineHeight: 17,
   },
   footer: {
     paddingHorizontal: 22,
