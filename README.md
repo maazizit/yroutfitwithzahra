@@ -37,29 +37,64 @@ d'achat affilié.
 
 ```bash
 npm install
-cp .env.example .env   # puis vérifie les valeurs
+cp .env.example .env   # déjà fait si tu utilises ce repo en local
 npx expo start         # scanne le QR code avec Expo Go
 ```
 
-## 🗄️ Configuration Supabase (une seule fois)
+## 🔌 Connexion Supabase + Awin + IA (à faire une fois)
 
-1. **Table + sécurité** : ouvre le [SQL Editor](https://supabase.com/dashboard) de ton
-   projet et exécute `supabase/schema.sql`.
-2. **Fonction IA** :
-   ```bash
-   supabase functions deploy tag-morphology
-   supabase secrets set GEMINI_API_KEY=<clé_créée_sur_aistudio.google.com>
-   ```
-3. **Cron du flux Awin** (quand le programme Shein est approuvé) :
-   ```bash
-   supabase functions deploy sync-awin-feed
-   supabase secrets set AWIN_FEED_URL=<url_create-a-feed_awin>
-   ```
-   puis planifie le cron `pg_cron` (instructions en bas de `supabase/schema.sql`).
+Le code est prêt ; le backend cloud doit encore être activé sur ton projet
+[`cuwtknywzfyvhuuvvrpd`](https://supabase.com/dashboard/project/cuwtknywzfyvhuuvvrpd).
 
-Tant que la table `products` est vide, l'app affiche automatiquement le catalogue de
-démonstration (`src/data/sample-products.ts`) — l'app fonctionne donc dès le premier
-lancement.
+### Option rapide (recommandée) — script automatique
+
+```powershell
+# 1. Connexion Supabase CLI (ouvre le navigateur) — requis pour déployer les Edge Functions
+supabase login
+
+# 2. Déploie table + Edge Functions + secrets
+#    (le schéma peut aussi passer par mot de passe PostgreSQL si pas encore fait)
+.\scripts\setup-backend.ps1 -DbPassword "TON_MDP_POSTGRES"
+
+# Avec toutes les clés :
+.\scripts\setup-backend.ps1 -DbPassword "TON_MDP" -GeminiApiKey "AIza..." -AwinFeedUrl "https://productdata.awin.com/..."
+```
+
+> Le mot de passe PostgreSQL ne va **jamais** dans `.env` ni sur GitHub — uniquement en argument du script ou variable d'environnement locale.
+
+| Secret | Où l'obtenir |
+|---|---|
+| `GEMINI_API_KEY` | Gratuit sur [Google AI Studio](https://aistudio.google.com/apikey) — tier gratuit Gemini 2.0 Flash |
+| `AWIN_FEED_URL` | [Awin](https://ui.awin.com/user) → **Outils → Create-a-Feed** → format **CSV** → copier l'URL du flux |
+
+> **Compte Awin `yroutfitwithzahra` (2982087)** : si Create-a-Feed est bloqué, complète d'abord le
+> profil éditeur (site web, espaces publicitaires, paiement) puis rejoins le programme **SHEIN**
+> (Annonceurs → S'inscrire à des programmes).
+
+### Option manuelle (dashboard Supabase)
+
+1. **Table** : [SQL Editor](https://supabase.com/dashboard/project/cuwtknywzfyvhuuvvrpd/sql/new) → coller et exécuter `supabase/schema.sql`.
+2. **IA** : [Edge Functions](https://supabase.com/dashboard/project/cuwtknywzfyvhuuvvrpd/functions) → déployer `tag-morphology` → [Secrets](https://supabase.com/dashboard/project/cuwtknywzfyvhuuvvrpd/functions/secrets) → `GEMINI_API_KEY`.
+3. **Catalogue Awin** : déployer `sync-awin-feed` → secret `AWIN_FEED_URL` → invoquer la fonction une fois.
+
+Tant que la table `products` est vide, l'app affiche le catalogue de démonstration — elle reste utilisable sur mobile.
+
+### Variables GitHub Actions (Secrets)
+
+| Secret GitHub | Variable `.env` | Usage |
+|---|---|---|
+| `EXPO_PUBLIC_SUPABASE_URL` | idem | App mobile |
+| `EXPO_PUBLIC_SUPABASE_KEY` | idem | App mobile |
+| `SUPABASE_DB_PASSWORD` | idem | Scripts import / migrations |
+| `GEMINI_API_KEY` | idem | Styliste IA (Edge Function) |
+| `AWIN_FEED_URL` | idem | Import catalogue Awin |
+| `SUPABASE_ACCESS_TOKEN` | optionnel (`sbp_...`) | Déploiement CLI Edge Functions |
+
+Import manuel du catalogue :
+
+```bash
+npm run import:awin
+```
 
 ## 🔗 Affiliation Awin
 
