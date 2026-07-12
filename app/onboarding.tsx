@@ -1,7 +1,9 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { FadeInView, PulseView, ScalePressable } from '@/components/anim';
 import { BudgetSlider } from '@/components/BudgetSlider';
 import { LogoMark } from '@/components/Logo';
 import { MorphologyPicker } from '@/components/MorphologyPicker';
@@ -37,15 +39,20 @@ export default function Onboarding() {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <LogoMark size={64} />
-          <Text style={styles.brandName}>
-            outfit <Text style={styles.brandWith}>with</Text> Zahra
-          </Text>
-          <Text style={styles.slogan}>
-            Tu es magnifique.{'\n'}Apprends juste à te mettre en valeur.
-          </Text>
-        </View>
+        <FadeInView delay={0} dy={10}>
+          <View style={styles.header}>
+            <PulseView minScale={1} maxScale={1.04} duration={1600}>
+              <LogoMark size={64} />
+            </PulseView>
+            <Text style={styles.brandName}>
+              outfit <Text style={styles.brandWith}>with</Text> Zahra
+            </Text>
+            <View style={styles.goldDivider} />
+            <Text style={styles.slogan}>
+              Tu es magnifique.{'\n'}Apprends juste à te mettre en valeur.
+            </Text>
+          </View>
+        </FadeInView>
 
         <View style={styles.dots}>
           <View style={[styles.dot, step === 1 && styles.dotActive]} />
@@ -54,45 +61,56 @@ export default function Onboarding() {
 
         {step === 1 ? (
           <View style={styles.section}>
-            <Text style={styles.title}>Quelle est ta silhouette ?</Text>
-            <Text style={styles.subtitle}>
-              Chaque forme est belle — on va juste apprendre à la sublimer.
-            </Text>
-            <MorphologyPicker value={morphology} onChange={setMorphology} />
+            <FadeInView delay={60}>
+              <Text style={styles.title}>Quelle est ta silhouette ?</Text>
+              <Text style={styles.subtitle}>
+                Chaque forme est belle — on va juste apprendre à la sublimer.
+              </Text>
+            </FadeInView>
+            <MorphologyPicker value={morphology} onChange={setMorphology} animateEntrance />
           </View>
         ) : (
           <View style={styles.section}>
-            <Text style={styles.title}>Ton budget par pièce ?</Text>
-            <Text style={styles.subtitle}>
-              On ne te montrera que des articles à ta portée. Zéro frustration.
-            </Text>
-            <View style={styles.budgetCard}>
-              <BudgetSlider value={budget} onChange={setBudget} />
-            </View>
+            <FadeInView delay={0}>
+              <Text style={styles.title}>Ton budget par pièce ?</Text>
+              <Text style={styles.subtitle}>
+                On ne te montrera que des articles à ta portée. Zéro frustration.
+              </Text>
+            </FadeInView>
+            <FadeInView delay={120}>
+              <View style={styles.budgetCard}>
+                <BudgetSlider value={budget} onChange={setBudget} />
+              </View>
+            </FadeInView>
           </View>
         )}
       </ScrollView>
 
       <View style={styles.footer}>
         {step === 2 && (
-          <Pressable onPress={() => setStep(1)} style={styles.backLink}>
+          <ScalePressable onPress={() => setStep(1)} style={styles.backLink}>
             <Text style={styles.backLinkText}>← Silhouette</Text>
-          </Pressable>
+          </ScalePressable>
         )}
-        <Pressable
+        <ScalePressable
           onPress={next}
           disabled={!canContinue || saving}
-          style={({ pressed }) => [
-            styles.cta,
-            (!canContinue || saving) && styles.ctaDisabled,
-            pressed && styles.ctaPressed,
-          ]}
+          pressedScale={0.97}
+          style={(!canContinue || saving) && styles.ctaDisabled}
           accessibilityRole="button"
         >
-          <Text style={styles.ctaText}>
-            {step === 1 ? 'Continuer' : 'Découvrir mes looks ✨'}
-          </Text>
-        </Pressable>
+          <LinearGradient
+            colors={[colors.ink, '#4A3B31']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.cta}
+          >
+            <Text style={styles.ctaText}>
+              {step === 1 ? 'Continuer' : 'Découvrir mes looks'}
+            </Text>
+            <Text style={styles.ctaSpark}>✨</Text>
+          </LinearGradient>
+        </ScalePressable>
       </View>
     </SafeAreaView>
   );
@@ -121,6 +139,14 @@ const styles = StyleSheet.create({
   brandWith: {
     fontStyle: 'italic',
     color: colors.accent,
+  },
+  goldDivider: {
+    width: 46,
+    height: 2,
+    backgroundColor: colors.gold,
+    borderRadius: 1,
+    marginTop: 12,
+    marginBottom: 2,
   },
   slogan: {
     fontFamily: serif,
@@ -161,6 +187,7 @@ const styles = StyleSheet.create({
     color: colors.muted,
     textAlign: 'center',
     marginBottom: 16,
+    marginTop: 6,
     lineHeight: 19,
   },
   budgetCard: {
@@ -179,27 +206,31 @@ const styles = StyleSheet.create({
   },
   backLink: {
     alignSelf: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 12,
   },
   backLinkText: {
     color: colors.muted,
     fontSize: 14,
   },
   cta: {
-    backgroundColor: colors.ink,
     borderRadius: radius.pill,
     paddingVertical: 16,
     alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
   },
   ctaDisabled: {
     opacity: 0.35,
-  },
-  ctaPressed: {
-    backgroundColor: colors.accentDark,
   },
   ctaText: {
     color: colors.white,
     fontSize: 16,
     fontWeight: '600',
     letterSpacing: 0.3,
+  },
+  ctaSpark: {
+    fontSize: 15,
   },
 });

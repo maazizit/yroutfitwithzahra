@@ -1,9 +1,10 @@
 import { Redirect } from 'expo-router';
 import React from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { PulseView } from '@/components/anim';
 import { LogoMark } from '@/components/Logo';
 import { useProfile } from '@/lib/profile';
-import { colors } from '@/theme';
+import { colors, serif } from '@/theme';
 
 export default function Index() {
   const { profile, loading } = useProfile();
@@ -11,7 +12,12 @@ export default function Index() {
   if (loading) {
     return (
       <View style={styles.splash}>
-        <LogoMark size={72} />
+        <PulseView minScale={0.96} maxScale={1.08} duration={700}>
+          <LogoMark size={72} />
+        </PulseView>
+        <Text style={styles.splashText}>
+          outfit <Text style={styles.splashWith}>with</Text> Zahra
+        </Text>
         <ActivityIndicator color={colors.accent} style={styles.spinner} />
       </View>
     );
@@ -26,6 +32,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.ivory,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  splashText: {
+    fontFamily: serif,
+    fontSize: 22,
+    color: colors.ink,
+    marginTop: 14,
+  },
+  splashWith: {
+    fontStyle: 'italic',
+    color: colors.accent,
   },
   spinner: {
     marginTop: 24,

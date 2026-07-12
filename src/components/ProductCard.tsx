@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
-import { Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AntDesign } from '@expo/vector-icons';
+import React, { useRef, useState } from 'react';
+import { Animated, Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { buildPurchaseUrl, discountPercent, formatPrice } from '@/lib/affiliate';
 import { morphologyLabel, type Morphology } from '@/lib/morphology';
 import type { Product } from '@/lib/types';
 import { colors, radius, serif, shadow } from '@/theme';
+import { ScalePressable, usePopAnimation } from './anim';
 
 interface Props {
   product: Product;
@@ -19,6 +21,10 @@ const BRAND_TINTS: Record<string, string> = {
 
 export function ProductCard({ product, userMorphology }: Props) {
   const [imageFailed, setImageFailed] = useState(false);
+  const [liked, setLiked] = useState(false);
+  const imageOpacity = useRef(new Animated.Value(0)).current;
+  const heartScale = usePopAnimation(liked);
+
   const discount = discountPercent(product);
   const ideal = product.tags.includes(userMorphology);
   const tint = BRAND_TINTS[product.brand] ?? colors.accentSoft;
@@ -28,24 +34,51 @@ export function ProductCard({ product, userMorphology }: Props) {
   };
 
   return (
-    <View style={styles.card}>
+    <ScalePressable style={styles.card} pressedScale={0.975} onPress={openPurchase}>
       <View style={[styles.imageWrap, { backgroundColor: tint }]}>
         {!imageFailed && product.image ? (
-          <Image
-            source={{ uri: product.image }}
-            style={styles.image}
-            resizeMode="cover"
-            onError={() => setImageFailed(true)}
-            accessibilityLabel={product.name}
-          />
+          <Animated.View style={[styles.imageFill, { opacity: imageOpacity }]}>
+            <Image
+              source={{ uri: product.image }}
+              style={styles.imageFill}
+              resizeMode="cover"
+              onError={() => setImageFailed(true)}
+              onLoad={() =>
+                Animated.timing(imageOpacity, {
+                  toValue: 1,
+                  duration: 420,
+                  useNativeDriver: true,
+                }).start()
+              }
+              accessibilityLabel={product.name}
+            />
+          </Animated.View>
         ) : (
           <Text style={styles.imageFallback}>{product.brand.charAt(0)}</Text>
         )}
+
         {discount !== null && (
           <View style={styles.discountBadge}>
             <Text style={styles.discountText}>-{discount}%</Text>
           </View>
         )}
+
+        <Pressable
+          onPress={() => setLiked((v) => !v)}
+          hitSlop={10}
+          style={styles.heartButton}
+          accessibilityRole="button"
+          accessibilityLabel={liked ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+        >
+          <Animated.View style={{ transform: [{ scale: heartScale }] }}>
+            <AntDesign
+              name={liked ? 'heart' : 'hearto'}
+              size={16}
+              color={liked ? colors.sale : colors.ink}
+            />
+          </Animated.View>
+        </Pressable>
+
         {ideal && (
           <View style={styles.morphoBadge}>
             <Text style={styles.morphoBadgeText}>
@@ -56,7 +89,10 @@ export function ProductCard({ product, userMorphology }: Props) {
       </View>
 
       <View style={styles.body}>
-        <Text style={styles.brand}>{product.brand}</Text>
+        <View style={styles.brandRow}>
+          <Text style={styles.brand}>{product.brand}</Text>
+          <View style={styles.brandLine} />
+        </View>
         <Text style={styles.name} numberOfLines={2}>
           {product.name}
         </Text>
@@ -68,16 +104,18 @@ export function ProductCard({ product, userMorphology }: Props) {
             </Text>
           )}
         </View>
-        <Pressable
+        <ScalePressable
           onPress={openPurchase}
-          style={({ pressed }) => [styles.buyButton, pressed && styles.buyButtonPressed]}
+          style={styles.buyButton}
+          pressedScale={0.94}
           accessibilityRole="button"
           accessibilityLabel={`Acheter ${product.name} chez ${product.brand}`}
         >
           <Text style={styles.buyText}>Acheter</Text>
-        </Pressable>
+          <Text style={styles.buyArrow}>→</Text>
+        </ScalePressable>
       </View>
-    </View>
+    </ScalePressable>
   );
 }
 
@@ -96,9 +134,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  image: {
-    width: '100%',
-    height: '100%',
+  imageFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   imageFallback: {
     fontFamily: serif,
@@ -119,6 +160,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+  heartButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   morphoBadge: {
     position: 'absolute',
     bottom: 8,
@@ -128,6 +180,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     paddingHorizontal: 8,
     paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: colors.goldSoft,
   },
   morphoBadgeText: {
     fontSize: 10.5,
@@ -139,12 +193,22 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 4,
   },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   brand: {
     fontSize: 10.5,
     letterSpacing: 1.5,
     color: colors.muted,
     textTransform: 'uppercase',
     fontWeight: '600',
+  },
+  brandLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.goldSoft,
   },
   name: {
     fontFamily: serif,
@@ -175,14 +239,19 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     paddingVertical: 10,
     alignItems: 'center',
-  },
-  buyButtonPressed: {
-    backgroundColor: colors.accentDark,
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 6,
   },
   buyText: {
     color: colors.white,
     fontSize: 13.5,
     fontWeight: '600',
     letterSpacing: 0.4,
+  },
+  buyArrow: {
+    color: colors.gold,
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { FadeInView } from '@/components/anim';
 import { LogoHeader } from '@/components/Logo';
 import { ProductCard } from '@/components/ProductCard';
 import { morphologyLabel } from '@/lib/morphology';
@@ -81,6 +82,16 @@ export default function ShopScreen() {
         </View>
       </View>
 
+      <FadeInView delay={80} dy={8}>
+        <View style={styles.editorial}>
+          <View style={styles.editorialLine} />
+          <Text style={styles.editorialText}>
+            La sélection <Text style={styles.editorialAccent}>{morphologyLabel(profile.morphology)}</Text>
+          </Text>
+          <View style={styles.editorialLine} />
+        </View>
+      </FadeInView>
+
       <View style={styles.filtersWrap}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
           {CATEGORY_FILTERS.map((c) => {
@@ -112,8 +123,10 @@ export default function ShopScreen() {
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />
           }
-          renderItem={({ item }) => (
-            <ProductCard product={item} userMorphology={profile.morphology} />
+          renderItem={({ item, index }) => (
+            <FadeInView delay={Math.min(index, 6) * 70} dy={22} style={styles.cardSlot}>
+              <ProductCard product={item} userMorphology={profile.morphology} />
+            </FadeInView>
           )}
           ListEmptyComponent={
             <View style={styles.center}>
@@ -152,6 +165,30 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '600',
     color: colors.ink,
+  },
+  editorial: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 18,
+    marginTop: 12,
+  },
+  editorialLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.goldSoft,
+  },
+  editorialText: {
+    fontFamily: serif,
+    fontStyle: 'italic',
+    fontSize: 15,
+    color: colors.muted,
+  },
+  editorialAccent: {
+    color: colors.accent,
+  },
+  cardSlot: {
+    flex: 1,
   },
   filtersWrap: {
     marginTop: 10,

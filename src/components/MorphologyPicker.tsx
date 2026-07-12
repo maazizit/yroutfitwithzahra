@@ -1,47 +1,74 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { MORPHOLOGIES, type Morphology } from '@/lib/morphology';
+import { Animated, StyleSheet, Text, View } from 'react-native';
+import { MORPHOLOGIES, type Morphology, type MorphologyInfo } from '@/lib/morphology';
 import { colors, radius, serif, shadow } from '@/theme';
+import { FadeInView, ScalePressable, usePopAnimation } from './anim';
 import { MorphologyIcon } from './MorphologyIcon';
 
 interface Props {
   value: Morphology | null;
   onChange: (value: Morphology) => void;
   compact?: boolean;
+  animateEntrance?: boolean;
 }
 
-export function MorphologyPicker({ value, onChange, compact = false }: Props) {
+interface CardProps {
+  info: MorphologyInfo;
+  selected: boolean;
+  compact: boolean;
+  onPress: () => void;
+}
+
+function MorphoCard({ info, selected, compact, onPress }: CardProps) {
+  const popScale = usePopAnimation(selected);
+
+  return (
+    <ScalePressable
+      onPress={onPress}
+      style={[styles.card, compact && styles.cardCompact, selected && styles.cardSelected]}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      accessibilityLabel={`Silhouette ${info.label}`}
+    >
+      <Animated.View style={[styles.cardInner, { transform: [{ scale: popScale }] }]}>
+        <MorphologyIcon
+          morphology={info.id}
+          size={compact ? 40 : 54}
+          color={selected ? colors.accent : colors.faint}
+        />
+        <Text style={[styles.label, selected && styles.labelSelected]}>{info.label}</Text>
+        {!compact && <Text style={styles.tagline}>{info.tagline}</Text>}
+      </Animated.View>
+      {selected && (
+        <View style={styles.check}>
+          <Text style={styles.checkText}>✓</Text>
+        </View>
+      )}
+    </ScalePressable>
+  );
+}
+
+export function MorphologyPicker({ value, onChange, compact = false, animateEntrance = false }: Props) {
   return (
     <View style={styles.grid}>
-      {MORPHOLOGIES.map((m) => {
-        const selected = value === m.id;
-        return (
-          <Pressable
-            key={m.id}
+      {MORPHOLOGIES.map((m, index) => {
+        const slotStyle = compact ? styles.slotCompact : styles.slot;
+        const card = (
+          <MorphoCard
+            info={m}
+            selected={value === m.id}
+            compact={compact}
             onPress={() => onChange(m.id)}
-            style={({ pressed }) => [
-              styles.card,
-              compact && styles.cardCompact,
-              selected && styles.cardSelected,
-              pressed && styles.cardPressed,
-            ]}
-            accessibilityRole="button"
-            accessibilityState={{ selected }}
-            accessibilityLabel={`Silhouette ${m.label}`}
-          >
-            <MorphologyIcon
-              morphology={m.id}
-              size={compact ? 40 : 54}
-              color={selected ? colors.accent : colors.faint}
-            />
-            <Text style={[styles.label, selected && styles.labelSelected]}>{m.label}</Text>
-            {!compact && <Text style={styles.tagline}>{m.tagline}</Text>}
-            {selected && (
-              <View style={styles.check}>
-                <Text style={styles.checkText}>✓</Text>
-              </View>
-            )}
-          </Pressable>
+          />
+        );
+        return animateEntrance ? (
+          <FadeInView key={m.id} delay={120 + index * 90} style={slotStyle}>
+            {card}
+          </FadeInView>
+        ) : (
+          <View key={m.id} style={slotStyle}>
+            {card}
+          </View>
         );
       })}
     </View>
@@ -55,8 +82,14 @@ const styles = StyleSheet.create({
     gap: 12,
     justifyContent: 'center',
   },
-  card: {
+  slot: {
     width: '46%',
+  },
+  slotCompact: {
+    width: '30%',
+  },
+  card: {
+    width: '100%',
     backgroundColor: colors.card,
     borderRadius: radius.md,
     borderWidth: 1.5,
@@ -64,19 +97,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 18,
     paddingHorizontal: 10,
-    gap: 8,
     ...shadow.card,
   },
   cardCompact: {
-    width: '30%',
     paddingVertical: 12,
   },
   cardSelected: {
     borderColor: colors.accent,
     backgroundColor: colors.accentSoft,
   },
-  cardPressed: {
-    opacity: 0.85,
+  cardInner: {
+    alignItems: 'center',
+    gap: 8,
   },
   label: {
     fontFamily: serif,

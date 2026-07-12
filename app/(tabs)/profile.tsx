@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { FadeInView } from '@/components/anim';
 import { BudgetSlider } from '@/components/BudgetSlider';
 import { LogoHeader } from '@/components/Logo';
 import { MorphologyPicker } from '@/components/MorphologyPicker';
@@ -55,7 +56,9 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <LogoHeader subtitle="Mon style" />
+        <FadeInView dy={8}>
+          <LogoHeader subtitle="Mon style" />
+        </FadeInView>
 
         <Text style={styles.sectionTitle}>Ma silhouette</Text>
         <MorphologyPicker value={morphology} onChange={setMorphology} compact />
