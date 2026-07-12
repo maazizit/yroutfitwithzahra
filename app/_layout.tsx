@@ -4,12 +4,14 @@ import React from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ProfileProvider } from '@/lib/profile';
+import { FavoritesProvider } from '@/lib/favorites';
 import { colors } from '@/theme';
 
 export default function RootLayout() {
   const app = (
     <SafeAreaProvider>
       <ProfileProvider>
+        <FavoritesProvider>
         <StatusBar style="dark" backgroundColor={colors.ivory} />
         <Stack
           screenOptions={{
@@ -21,6 +23,7 @@ export default function RootLayout() {
           <Stack.Screen name="onboarding" />
           <Stack.Screen name="(tabs)" />
         </Stack>
+        </FavoritesProvider>
       </ProfileProvider>
     </SafeAreaProvider>
   );

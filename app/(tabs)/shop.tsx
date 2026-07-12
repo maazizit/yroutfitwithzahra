@@ -11,12 +11,16 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { DailyOutfitCard } from '@/components/DailyOutfitCard';
 import { FadeInView } from '@/components/anim';
 import { FilterChips } from '@/components/FilterChips';
 import { LogoHeader } from '@/components/Logo';
 import { ProductCard } from '@/components/ProductCard';
 import { ShopFilterBar } from '@/components/ShopFilterBar';
+import { ShopToggles } from '@/components/ShopToggles';
 import { colorsSummary } from '@/lib/colors';
+import { buildDailyOutfit } from '@/lib/outfit';
+import { genderLabel } from '@/lib/gender';
 import { morphologyLabel } from '@/lib/morphology';
 import { fetchProducts, shoppingFeed } from '@/lib/products';
 import { useProfile } from '@/lib/profile';
@@ -42,7 +46,12 @@ export default function ShopScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [category, setCategory] = useState<Category | 'Tous'>('Tous');
-  const [shopFilters, setShopFilters] = useState<ShopFilterState>({ sizes: [], colors: [] });
+  const [shopFilters, setShopFilters] = useState<ShopFilterState>({
+    sizes: [],
+    colors: [],
+    morphologyOnly: false,
+    modestOnly: false,
+  });
 
   const load = useCallback(async () => {
     setProducts(await fetchProducts());
@@ -64,6 +73,11 @@ export default function ShopScreen() {
     return category === 'Tous' ? base : base.filter((p) => p.category === category);
   }, [products, profile, category, shopFilters]);
 
+  const dailyOutfit = useMemo(() => {
+    if (!profile || category !== 'Tous') return null;
+    return buildDailyOutfit(products, profile, shopFilters);
+  }, [products, profile, shopFilters, category]);
+
   if (!profile) {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
@@ -77,7 +91,14 @@ export default function ShopScreen() {
     );
   }
 
-  const hasActiveShopFilters = shopFilters.sizes.length > 0 || shopFilters.colors.length > 0;
+  const hasActiveShopFilters =
+    shopFilters.sizes.length > 0 ||
+    shopFilters.colors.length > 0 ||
+    shopFilters.morphologyOnly === true ||
+    shopFilters.modestOnly === true;
+
+  const resetFilters = () =>
+    setShopFilters({ sizes: [], colors: [], morphologyOnly: false, modestOnly: false });
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -100,7 +121,7 @@ export default function ShopScreen() {
                 <Text style={styles.profileLabel}>Mon style</Text>
                 <Text style={styles.profileValue} numberOfLines={1}>
                   {profile.modestMode ? '🧕 ' : ''}
-                  {morphologyLabel(profile.morphology)} · ≤ {profile.budget} €
+                  {genderLabel(profile.gender)} · {morphologyLabel(profile.morphology)} · ≤ {profile.budget} €
                 </Text>
               </View>
               <Text style={styles.profileChevron}>›</Text>
@@ -125,6 +146,15 @@ export default function ShopScreen() {
         colors={shopFilters.colors}
         onChangeSizes={(sizes) => setShopFilters((f) => ({ ...f, sizes }))}
         onChangeColors={(colors) => setShopFilters((f) => ({ ...f, colors: colors }))}
+      />
+
+      <ShopToggles
+        morphology={profile.morphology}
+        morphologyOnly={shopFilters.morphologyOnly === true}
+        modestOnly={shopFilters.modestOnly === true}
+        profileModestMode={profile.modestMode}
+        onMorphologyOnlyChange={(v) => setShopFilters((f) => ({ ...f, morphologyOnly: v }))}
+        onModestOnlyChange={(v) => setShopFilters((f) => ({ ...f, modestOnly: v }))}
       />
 
       <View style={styles.filtersWrap}>
@@ -158,6 +188,13 @@ export default function ShopScreen() {
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />
           }
+          ListHeaderComponent={
+            dailyOutfit ? (
+              <View style={styles.outfitHeader}>
+                <DailyOutfitCard outfit={dailyOutfit} morphology={profile.morphology} />
+              </View>
+            ) : null
+          }
           renderItem={({ item, index }) => (
             <FadeInView delay={Math.min(index, 6) * 70} dy={22} style={styles.cardSlot}>
               <ProductCard product={item} userMorphology={profile.morphology} />
@@ -169,13 +206,12 @@ export default function ShopScreen() {
               <Text style={styles.emptyText}>
                 {products.length === 0
                   ? 'Importe un flux mode Awin (Bodycross, lingerie…), puis tire pour rafraîchir.'
-                  : 'Essaye « Effacer » les filtres, change de catégorie, ou augmente ton budget dans Mon style.'}
+                  : shopFilters.morphologyOnly
+                    ? 'Aucune pièce taguée pour ta silhouette. Désactive « Silhouette » ou importe plus de flux.'
+                    : 'Essaye « Effacer » les filtres, change de catégorie, ou augmente ton budget dans Mon style.'}
               </Text>
               {hasActiveShopFilters && (
-                <Pressable
-                  style={styles.emptyCta}
-                  onPress={() => setShopFilters({ sizes: [], colors: [] })}
-                >
+                <Pressable style={styles.emptyCta} onPress={resetFilters}>
                   <Text style={styles.emptyCtaText}>Effacer mes filtres</Text>
                 </Pressable>
               )}
@@ -289,6 +325,10 @@ const styles = StyleSheet.create({
     color: colors.muted,
   },
   filtersWrap: { marginTop: 2 },
+  outfitHeader: {
+    marginBottom: 14,
+    width: '100%',
+  },
   profileHint: {
     fontSize: 11.5,
     color: colors.faint,

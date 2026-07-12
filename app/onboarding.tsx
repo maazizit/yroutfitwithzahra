@@ -6,8 +6,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { FadeInView, PulseView, ScalePressable } from '@/components/anim';
 import { BudgetSlider } from '@/components/BudgetSlider';
 import { BrandLogo } from '@/components/Logo';
+import { GenderPicker } from '@/components/GenderPicker';
 import { MorphologyPicker } from '@/components/MorphologyPicker';
 import { StylePreferencesPicker } from '@/components/StylePreferencesPicker';
+import type { Gender } from '@/lib/gender';
 import type { Morphology } from '@/lib/morphology';
 import { useProfile } from '@/lib/profile';
 import { colors, radius, serif } from '@/theme';
@@ -16,6 +18,7 @@ export default function Onboarding() {
   const router = useRouter();
   const { saveProfile } = useProfile();
   const [step, setStep] = useState<1 | 2>(1);
+  const [gender, setGender] = useState<Gender>('femme');
   const [morphology, setMorphology] = useState<Morphology | null>(null);
   const [budget, setBudget] = useState(30);
   const [modestMode, setModestMode] = useState(false);
@@ -31,7 +34,7 @@ export default function Onboarding() {
     if (!morphology || saving) return;
     setSaving(true);
     try {
-      await saveProfile({ morphology, budget, modestMode, clothingSizes, favoriteColors });
+      await saveProfile({ gender, morphology, budget, modestMode, clothingSizes, favoriteColors });
       router.replace('/(tabs)/shop');
     } finally {
       setSaving(false);
@@ -63,7 +66,12 @@ export default function Onboarding() {
         {step === 1 ? (
           <View style={styles.section}>
             <FadeInView delay={60}>
-              <Text style={styles.title}>Quelle est ta silhouette ?</Text>
+              <Text style={styles.title}>Tu cherches pour…</Text>
+              <Text style={styles.subtitle}>On adapte le catalogue à ton univers mode.</Text>
+            </FadeInView>
+            <GenderPicker value={gender} onChange={setGender} />
+            <FadeInView delay={100}>
+              <Text style={styles.stepTitle}>Quelle est ta silhouette ?</Text>
               <Text style={styles.subtitle}>
                 Chaque forme est belle — on va juste apprendre à la sublimer.
               </Text>
@@ -213,6 +221,13 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: colors.ink,
     textAlign: 'center',
+  },
+  stepTitle: {
+    fontFamily: serif,
+    fontSize: 20,
+    color: colors.ink,
+    textAlign: 'center',
+    marginTop: 4,
   },
   subtitle: {
     fontSize: 13.5,

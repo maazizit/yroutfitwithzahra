@@ -1,6 +1,7 @@
 import { discountPercent } from './affiliate';
 import { isClothingProduct, isLikelyGiftOrSample } from './catalog';
 import { matchesColors } from './colors';
+import { inferProductGender, matchesGender, type ProductGender } from './gender';
 import type { Morphology } from './morphology';
 import { ALL_MORPHOLOGIES } from './morphology';
 import { matchesClothingSizes } from './sizes';
@@ -24,6 +25,7 @@ interface ProductRow {
   modest: boolean | null;
   sizes: string[] | null;
   colours: string[] | null;
+  gender: string | null;
 }
 
 function rowToProduct(row: ProductRow): Product | null {
@@ -36,6 +38,11 @@ function rowToProduct(row: ProductRow): Product | null {
   const category = CATEGORIES.includes(row.category as Category)
     ? (row.category as Category)
     : 'Hauts';
+  const genderRaw = row.gender as ProductGender | null;
+  const gender: ProductGender =
+    genderRaw === 'femme' || genderRaw === 'homme' || genderRaw === 'mixte'
+      ? genderRaw
+      : inferProductGender(`${row.name} ${row.category ?? ''}`);
   return {
     id: row.id,
     name: row.name,
@@ -51,6 +58,7 @@ function rowToProduct(row: ProductRow): Product | null {
     modest: row.modest === true,
     sizes: row.sizes?.length ? row.sizes.map((s) => s.trim()).filter(Boolean) : [],
     colors: row.colours?.length ? row.colours.map((c) => c.trim()).filter(Boolean) : [],
+    gender,
   };
 }
 
@@ -94,6 +102,12 @@ function passesFilters(product: Product, filters: ShopFilterState): boolean {
   );
 }
 
+function passesShopToggles(product: Product, profile: UserProfile, shopFilters?: ShopFilterState): boolean {
+  if (shopFilters?.morphologyOnly && !matchesMorphology(product, profile.morphology)) return false;
+  if (shopFilters?.modestOnly && product.modest !== true) return false;
+  return true;
+}
+
 /** Flux principal : vêtements uniquement, budget, pudeur, tailles/couleurs, morpho en tête. */
 export function shoppingFeed(
   products: Product[],
@@ -106,8 +120,10 @@ export function shoppingFeed(
       (p) =>
         p.price > 0 &&
         p.price <= profile.budget &&
+        matchesGender(p.gender, profile.gender) &&
         respectsModesty(p, profile) &&
-        passesFilters(p, filters),
+        passesFilters(p, filters) &&
+        passesShopToggles(p, profile, shopFilters),
     )
     .sort((a, b) => {
       const ma = matchesMorphology(a, profile.morphology) ? 1 : 0;
@@ -129,8 +145,10 @@ export function privateSalesFeed(
         (discountPercent(p) ?? 0) >= 30 &&
         p.price > 0 &&
         p.price <= profile.budget &&
+        matchesGender(p.gender, profile.gender) &&
         respectsModesty(p, profile) &&
-        passesFilters(p, filters),
+        passesFilters(p, filters) &&
+        passesShopToggles(p, profile, shopFilters),
     )
     .sort((a, b) => {
       const ma = matchesMorphology(a, profile.morphology) ? 1 : 0;

@@ -10,16 +10,19 @@ interface Props {
   onChange: (value: Morphology) => void;
   compact?: boolean;
   animateEntrance?: boolean;
+  /** Avatars avec hijab (mode pudeur) */
+  modestStyle?: boolean;
 }
 
 interface CardProps {
   info: MorphologyInfo;
   selected: boolean;
   compact: boolean;
+  modestStyle: boolean;
   onPress: () => void;
 }
 
-function MorphoCard({ info, selected, compact, onPress }: CardProps) {
+function MorphoCard({ info, selected, compact, modestStyle, onPress }: CardProps) {
   const popScale = usePopAnimation(selected);
   const avatarSize = compact ? 52 : 68;
 
@@ -37,6 +40,7 @@ function MorphoCard({ info, selected, compact, onPress }: CardProps) {
             morphology={info.id}
             size={avatarSize}
             selected={selected}
+            modest={modestStyle}
           />
         </View>
         <Text style={[styles.label, selected && styles.labelSelected]}>{info.label}</Text>
@@ -51,14 +55,20 @@ function MorphoCard({ info, selected, compact, onPress }: CardProps) {
   );
 }
 
-export function MorphologyPicker({ value, onChange, compact = false, animateEntrance = false }: Props) {
+export function MorphologyPicker({
+  value,
+  onChange,
+  compact = false,
+  animateEntrance = false,
+  modestStyle = false,
+}: Props) {
   const selectedInfo = MORPHOLOGIES.find((m) => m.id === value);
 
   return (
     <View style={styles.wrap}>
       {selectedInfo && !compact && (
         <View style={styles.preview}>
-          <MorphologyIcon morphology={selectedInfo.id} size={56} selected />
+          <MorphologyIcon morphology={selectedInfo.id} size={56} selected modest={modestStyle} />
           <View style={styles.previewText}>
             <Text style={styles.previewTitle}>{selectedInfo.label}</Text>
             <Text style={styles.previewTagline}>{selectedInfo.tagline}</Text>
@@ -74,6 +84,7 @@ export function MorphologyPicker({ value, onChange, compact = false, animateEntr
               info={m}
               selected={value === m.id}
               compact={compact}
+              modestStyle={modestStyle}
               onPress={() => onChange(m.id)}
             />
           );

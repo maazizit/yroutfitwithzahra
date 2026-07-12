@@ -118,6 +118,21 @@ function inferTags(text) {
   return [...tags].filter((t) => ALLOWED_TAGS.includes(t));
 }
 
+function inferGender(text) {
+  const t = text.toLowerCase();
+  if (/unisex|unisexe|mixte|gender\s*neutral/i.test(t)) return 'mixte';
+  const homme =
+    /homme|men'?s?\b|\bman\b|masculin|garçon|garcon|\bmale\b|for\s*him|pour\s*lui|boy'?s?\b/i.test(t);
+  const femme =
+    /femme|women|woman|ladies|\blady\b|féminin|feminin|\bfille\b|\bfemale\b|for\s*her|pour\s*elle|\brobe\b|\bdress\b|jupe|skirt|soutien|lingerie|\bbra\b/i.test(
+      t,
+    );
+  if (homme && femme) return 'mixte';
+  if (homme) return 'homme';
+  if (femme) return 'femme';
+  return 'mixte';
+}
+
 const SIZE_ALIASES = {
   SMALL: 'S', MEDIUM: 'M', LARGE: 'L', XLARGE: 'XL',
   T0: 'XS', T1: 'S', T2: 'M', T3: 'L', T4: 'XL', '3XL': 'XXL',
@@ -289,6 +304,7 @@ async function main() {
       modest: MODEST_PATTERN.test(haystack),
       sizes: extractSizes(cells, sizeIdx, cells[idx.name], description),
       colours: extractColours(cells, colourIdx, cells[idx.name], description),
+      gender: inferGender(haystack),
     });
     if (rows.length >= 1000) break;
   }
@@ -305,17 +321,17 @@ async function main() {
   });
   await client.connect();
 
-  const cols = ['id', 'name', 'brand', 'price', 'original_price', 'currency', 'image', 'url', 'awin_mid', 'tags', 'category', 'modest', 'sizes', 'colours'];
+  const cols = ['id', 'name', 'brand', 'price', 'original_price', 'currency', 'image', 'url', 'awin_mid', 'tags', 'category', 'modest', 'sizes', 'colours', 'gender'];
   const values = [];
   const params = [];
   let p = 1;
   for (const row of rows) {
     values.push(
-      `($${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++})`,
+      `($${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++})`,
     );
     params.push(
       row.id, row.name, row.brand, row.price, row.original_price, row.currency,
-      row.image, row.url, row.awin_mid, row.tags, row.category, row.modest, row.sizes, row.colours,
+      row.image, row.url, row.awin_mid, row.tags, row.category, row.modest, row.sizes, row.colours, row.gender,
     );
   }
 
@@ -337,6 +353,7 @@ async function main() {
       modest = EXCLUDED.modest,
       sizes = EXCLUDED.sizes,
       colours = EXCLUDED.colours,
+      gender = EXCLUDED.gender,
       updated_at = now()
   `;
     await client.query(sql, params);

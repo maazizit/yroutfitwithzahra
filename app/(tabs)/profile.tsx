@@ -14,9 +14,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { FadeInView } from '@/components/anim';
 import { BudgetSlider } from '@/components/BudgetSlider';
 import { LogoHeader } from '@/components/Logo';
+import { GenderPicker } from '@/components/GenderPicker';
 import { MorphologyPicker } from '@/components/MorphologyPicker';
 import { StylePreferencesPicker } from '@/components/StylePreferencesPicker';
 import { tagGarment, type MorphoTagResult } from '@/lib/gemini';
+import type { Gender } from '@/lib/gender';
 import { morphologyInfo, morphologyLabel, type Morphology } from '@/lib/morphology';
 import { useProfile } from '@/lib/profile';
 import { colors, radius, serif } from '@/theme';
@@ -24,6 +26,7 @@ import { colors, radius, serif } from '@/theme';
 export default function ProfileScreen() {
   const router = useRouter();
   const { profile, saveProfile, resetProfile } = useProfile();
+  const [gender, setGender] = useState<Gender>(profile?.gender ?? 'femme');
   const [morphology, setMorphology] = useState<Morphology | null>(profile?.morphology ?? null);
   const [budget, setBudget] = useState(profile?.budget ?? 30);
   const [modestMode, setModestMode] = useState(profile?.modestMode ?? false);
@@ -38,7 +41,7 @@ export default function ProfileScreen() {
 
   const save = async () => {
     if (!morphology) return;
-    await saveProfile({ morphology, budget, modestMode, clothingSizes, favoriteColors });
+    await saveProfile({ gender, morphology, budget, modestMode, clothingSizes, favoriteColors });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -72,8 +75,16 @@ export default function ProfileScreen() {
           <LogoHeader subtitle="Mon style" />
         </FadeInView>
 
+        <Text style={styles.sectionTitle}>Mon univers</Text>
+        <GenderPicker value={gender} onChange={setGender} />
+
         <Text style={styles.sectionTitle}>Ma silhouette</Text>
-        <MorphologyPicker value={morphology} onChange={setMorphology} compact />
+        <MorphologyPicker
+          value={morphology}
+          onChange={setMorphology}
+          compact
+          modestStyle={modestMode}
+        />
 
         {info && (
           <View style={styles.adviceCard}>

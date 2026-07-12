@@ -8,6 +8,8 @@ interface Props {
   size?: number;
   color?: string;
   selected?: boolean;
+  /** Affiche un hijab stylisé (mode pudeur) */
+  modest?: boolean;
 }
 
 const VIEW_W = 72;
@@ -19,6 +21,7 @@ export function MorphologyIcon({
   size = 72,
   color,
   selected = false,
+  modest = false,
 }: Props) {
   const height = Math.round(size * (VIEW_H / VIEW_W));
   const stroke = color ?? (selected ? colors.accentDark : colors.muted);
@@ -33,6 +36,15 @@ export function MorphologyIcon({
     <Svg width={size} height={height} viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} fill="none">
       <Circle cx="36" cy="48" r="34" fill={auraFill} />
       <Circle cx="36" cy="17" r="12" fill={headFill} stroke={stroke} strokeWidth="2" />
+      {modest ? (
+        <Path
+          d="M18 20 C22 14 30 11 36 11 C42 11 50 14 54 20 C52 28 46 34 36 36 C26 34 20 28 18 20 Z"
+          fill={selected ? colors.sageSoft : colors.ivory}
+          stroke={stroke}
+          strokeWidth="1.8"
+          strokeLinejoin="round"
+        />
+      ) : null}
       <Path
         d={body}
         fill={bodyFill}

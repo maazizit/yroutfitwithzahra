@@ -1,4 +1,5 @@
 import type { Morphology } from './morphology';
+import type { Gender, ProductGender } from './gender';
 
 export type Category = 'Robes' | 'Hauts' | 'Bas' | 'Vestes' | 'Accessoires';
 
@@ -21,9 +22,13 @@ export interface Product {
   sizes?: string[];
   /** Couleurs disponibles */
   colors?: string[];
+  /** Femme, homme ou mixte (unisexe) */
+  gender?: ProductGender;
 }
 
 export interface UserProfile {
+  /** Genre des vêtements recherchés */
+  gender: Gender;
   morphology: Morphology;
   budget: number;
   /** Mode Pudeur : n'afficher que des pièces couvrantes et amples */
@@ -37,4 +42,16 @@ export interface UserProfile {
 export interface ShopFilterState {
   sizes: string[];
   colors: string[];
+  /** Afficher uniquement les pièces taguées pour la morpho du profil */
+  morphologyOnly?: boolean;
+  /** Afficher uniquement les pièces pudiques / modestes */
+  modestOnly?: boolean;
+}
+
+export interface DailyOutfit {
+  top?: Product;
+  bottom?: Product;
+  jacket?: Product;
+  dress?: Product;
+  totalPrice: number;
 }

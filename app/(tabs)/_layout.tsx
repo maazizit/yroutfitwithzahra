@@ -65,9 +65,9 @@ export default function TabsLayout() {
           ...shadow.float,
         },
         tabBarLabelStyle: {
-          fontSize: 10.5,
+          fontSize: 9.5,
           fontWeight: '600',
-          letterSpacing: 0.3,
+          letterSpacing: 0.2,
         },
         sceneStyle: { backgroundColor: colors.ivory },
       }}
@@ -78,6 +78,15 @@ export default function TabsLayout() {
           title: 'Pour toi',
           tabBarIcon: ({ color, size, focused }) => (
             <TabIcon name="shopping-bag" color={color} size={size} focused={focused} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="favorites"
+        options={{
+          title: 'Favoris',
+          tabBarIcon: ({ color, size, focused }) => (
+            <TabIcon name="heart" color={color} size={size} focused={focused} />
           ),
         }}
       />

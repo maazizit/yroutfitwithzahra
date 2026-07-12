@@ -1,3 +1,4 @@
+import { genderLabel } from './gender';
 import { morphologyInfo, morphologyLabel } from './morphology';
 import { SUPABASE_KEY, SUPABASE_URL } from './supabase';
 import type { UserProfile } from './types';
@@ -165,6 +166,6 @@ export function welcomeMessage(profile: UserProfile): ZahraMessage {
   return {
     id: 'welcome',
     role: 'zahra',
-    text: `Bienvenue dans mon salon de style 🌸\n\nJe suis Zahra. Silhouette ${morphologyLabel(profile.morphology)}, budget ${profile.budget} € — j'ai déjà tout en tête.${modestNote}\n\nDis-moi pour quelle occasion tu veux briller, ou choisis une question ci-dessous 👇`,
+    text: `Bienvenue dans mon salon de style 🌸\n\nJe suis Zahra. Mode ${genderLabel(profile.gender)}, silhouette ${morphologyLabel(profile.morphology)}, budget ${profile.budget} € — j'ai déjà tout en tête.${modestNote}\n\nDis-moi pour quelle occasion tu veux briller, ou choisis une question ci-dessous 👇`,
   };
 }

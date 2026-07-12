@@ -3,7 +3,9 @@ import React, { useRef, useState } from 'react';
 import { Animated, Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colorLabel, colorSwatch } from '@/lib/colors';
 import { buildPurchaseUrl, discountPercent, formatPrice } from '@/lib/affiliate';
+import { useFavorites } from '@/lib/favorites';
 import { morphologyLabel, type Morphology } from '@/lib/morphology';
+import { shareProduct } from '@/lib/share';
 import type { Product } from '@/lib/types';
 import { colors, radius, serif, shadow } from '@/theme';
 import { ScalePressable, usePopAnimation } from './anim';
@@ -69,8 +71,9 @@ function BuyButton({ onBuy, accessibilityLabel }: { onBuy: () => void; accessibi
 }
 
 export function ProductCard({ product, userMorphology }: Props) {
+  const { isFavorite, toggleFavorite } = useFavorites();
   const [imageFailed, setImageFailed] = useState(false);
-  const [liked, setLiked] = useState(false);
+  const liked = isFavorite(product.id);
   const imageOpacity = useRef(new Animated.Value(0)).current;
   const heartScale = usePopAnimation(liked);
 
@@ -122,21 +125,38 @@ export function ProductCard({ product, userMorphology }: Props) {
           </View>
         )}
 
-        <Pressable
-          onPress={() => setLiked((v) => !v)}
-          hitSlop={10}
-          style={styles.heartButton}
-          accessibilityRole="button"
-          accessibilityLabel={liked ? 'Retirer des favoris' : 'Ajouter aux favoris'}
-        >
-          <Animated.View style={{ transform: [{ scale: heartScale }] }}>
-            <AntDesign
-              name={liked ? 'heart' : 'hearto'}
-              size={16}
-              color={liked ? colors.sale : colors.ink}
-            />
-          </Animated.View>
-        </Pressable>
+        <View style={styles.topActions}>
+          <Pressable
+            onPress={(e) => {
+              e.stopPropagation?.();
+              void shareProduct(product);
+            }}
+            hitSlop={8}
+            style={styles.actionButton}
+            accessibilityRole="button"
+            accessibilityLabel="Partager ce look"
+          >
+            <AntDesign name="sharealt" size={14} color={colors.ink} />
+          </Pressable>
+          <Pressable
+            onPress={(e) => {
+              e.stopPropagation?.();
+              void toggleFavorite(product.id);
+            }}
+            hitSlop={8}
+            style={styles.actionButton}
+            accessibilityRole="button"
+            accessibilityLabel={liked ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+          >
+            <Animated.View style={{ transform: [{ scale: heartScale }] }}>
+              <AntDesign
+                name={liked ? 'heart' : 'hearto'}
+                size={16}
+                color={liked ? colors.sale : colors.ink}
+              />
+            </Animated.View>
+          </Pressable>
+        </View>
 
         {ideal && (
           <View style={styles.morphoBadge}>
@@ -243,31 +263,39 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 10,
     left: 10,
-    backgroundColor: colors.sageSoft,
-    borderWidth: 1,
-    borderColor: colors.sage,
+    backgroundColor: colors.sage,
     borderRadius: radius.pill,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1.5,
+    borderColor: '#7A9A72',
+    ...shadow.card,
   },
   modestBadgeShifted: {
-    top: 38,
+    top: 42,
   },
   modestText: {
-    fontSize: 10.5,
-    fontWeight: '600',
-    color: '#4E6147',
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.white,
+    letterSpacing: 0.3,
   },
-  heartButton: {
+  topActions: {
     position: 'absolute',
     top: 10,
     right: 10,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: 'rgba(255,255,255,0.92)',
+    flexDirection: 'row',
+    gap: 6,
+  },
+  actionButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.94)',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   morphoBadge: {
     position: 'absolute',

@@ -8,6 +8,7 @@ import React, {
   useState,
 } from 'react';
 import { ALL_MORPHOLOGIES } from './morphology';
+import { GENDERS } from './gender';
 import type { UserProfile } from './types';
 
 const STORAGE_KEY = 'owz.profile.v1';
@@ -38,6 +39,10 @@ function parseProfile(raw: string | null): UserProfile | null {
       (ALL_MORPHOLOGIES as string[]).includes(parsed.morphology)
     ) {
       return {
+        gender:
+          typeof parsed.gender === 'string' && (GENDERS as string[]).includes(parsed.gender)
+            ? parsed.gender
+            : 'femme',
         morphology: parsed.morphology,
         budget: parsed.budget,
         modestMode: parsed.modestMode === true,
