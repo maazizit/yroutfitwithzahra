@@ -20,6 +20,53 @@ const BRAND_TINTS: Record<string, string> = {
   MANGO: colors.accentSoft,
 };
 
+/**
+ * Bouton d'achat interactif : au clic il se transforme (couleur sauge,
+ * coche animée, « On y va ! ») puis ouvre la boutique.
+ */
+function BuyButton({ onBuy, accessibilityLabel }: { onBuy: () => void; accessibilityLabel: string }) {
+  const [done, setDone] = useState(false);
+  const progress = useRef(new Animated.Value(0)).current;
+  const checkScale = usePopAnimation(done);
+
+  const backgroundColor = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [colors.ink, '#6FA97A'],
+  });
+
+  const handlePress = () => {
+    if (done) return;
+    setDone(true);
+    Animated.timing(progress, { toValue: 1, duration: 260, useNativeDriver: false }).start();
+    setTimeout(onBuy, 420);
+    setTimeout(() => {
+      Animated.timing(progress, { toValue: 0, duration: 320, useNativeDriver: false }).start(() =>
+        setDone(false),
+      );
+    }, 2000);
+  };
+
+  return (
+    <Pressable onPress={handlePress} accessibilityRole="button" accessibilityLabel={accessibilityLabel}>
+      <Animated.View style={[styles.buyButton, { backgroundColor }]}>
+        {done ? (
+          <>
+            <Animated.View style={{ transform: [{ scale: checkScale }] }}>
+              <AntDesign name="check" size={15} color={colors.white} />
+            </Animated.View>
+            <Text style={styles.buyText}>On y va !</Text>
+          </>
+        ) : (
+          <>
+            <Text style={styles.buyText}>Acheter</Text>
+            <Text style={styles.buyArrow}>→</Text>
+          </>
+        )}
+      </Animated.View>
+    </Pressable>
+  );
+}
+
 export function ProductCard({ product, userMorphology }: Props) {
   const [imageFailed, setImageFailed] = useState(false);
   const [liked, setLiked] = useState(false);
@@ -35,7 +82,7 @@ export function ProductCard({ product, userMorphology }: Props) {
   };
 
   return (
-    <ScalePressable style={styles.card} pressedScale={0.975} onPress={openPurchase}>
+    <ScalePressable style={styles.card} pressedScale={0.975} onPress={openPurchase} hoverLift>
       <View style={[styles.imageWrap, { backgroundColor: tint }]}>
         {!imageFailed && product.image ? (
           <Animated.View style={[styles.imageFill, { opacity: imageOpacity }]}>
@@ -115,16 +162,10 @@ export function ProductCard({ product, userMorphology }: Props) {
             </Text>
           )}
         </View>
-        <ScalePressable
-          onPress={openPurchase}
-          style={styles.buyButton}
-          pressedScale={0.94}
-          accessibilityRole="button"
+        <BuyButton
+          onBuy={openPurchase}
           accessibilityLabel={`Acheter ${product.name} chez ${product.brand}`}
-        >
-          <Text style={styles.buyText}>Acheter</Text>
-          <Text style={styles.buyArrow}>→</Text>
-        </ScalePressable>
+        />
       </View>
     </ScalePressable>
   );

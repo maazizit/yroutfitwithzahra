@@ -53,18 +53,27 @@ interface ScalePressableProps extends PressableProps {
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
   pressedScale?: number;
+  /** Au survol (web / souris) : la carte se soulève légèrement. */
+  hoverLift?: boolean;
 }
 
-/** Pressable avec micro-rebond au toucher — feedback tactile premium. */
+/** Pressable avec micro-rebond au toucher et lift au survol — feedback premium. */
 export function ScalePressable({
   children,
   style,
   pressedScale = 0.96,
+  hoverLift = false,
   onPressIn,
   onPressOut,
+  onHoverIn,
+  onHoverOut,
   ...rest
 }: ScalePressableProps) {
   const scale = useRef(new Animated.Value(1)).current;
+  const lift = useRef(new Animated.Value(0)).current;
+
+  const hoverScale = lift.interpolate({ inputRange: [0, 1], outputRange: [1, 1.02] });
+  const hoverY = lift.interpolate({ inputRange: [0, 1], outputRange: [0, -6] });
 
   return (
     <Pressable
@@ -87,8 +96,32 @@ export function ScalePressable({
         }).start();
         onPressOut?.(e);
       }}
+      onHoverIn={(e) => {
+        if (hoverLift) {
+          Animated.spring(lift, { toValue: 1, useNativeDriver: true, speed: 30 }).start();
+        }
+        onHoverIn?.(e);
+      }}
+      onHoverOut={(e) => {
+        if (hoverLift) {
+          Animated.spring(lift, { toValue: 0, useNativeDriver: true, speed: 30 }).start();
+        }
+        onHoverOut?.(e);
+      }}
     >
-      <Animated.View style={[style, { transform: [{ scale }] }]}>{children}</Animated.View>
+      <Animated.View
+        style={[
+          style,
+          {
+            transform: [
+              { scale: Animated.multiply(scale, hoverScale) },
+              { translateY: hoverY },
+            ],
+          },
+        ]}
+      >
+        {children}
+      </Animated.View>
     </Pressable>
   );
 }

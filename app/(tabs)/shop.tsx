@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FadeInView } from '@/components/anim';
+import { FilterChips } from '@/components/FilterChips';
 import { LogoHeader } from '@/components/Logo';
 import { ProductCard } from '@/components/ProductCard';
 import { morphologyLabel } from '@/lib/morphology';
@@ -103,20 +104,7 @@ export default function ShopScreen() {
       </FadeInView>
 
       <View style={styles.filtersWrap}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
-          {CATEGORY_FILTERS.map((c) => {
-            const active = category === c;
-            return (
-              <Pressable
-                key={c}
-                onPress={() => setCategory(c)}
-                style={[styles.chip, active && styles.chipActive]}
-              >
-                <Text style={[styles.chipText, active && styles.chipTextActive]}>{c}</Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+        <FilterChips options={CATEGORY_FILTERS} value={category} onChange={setCategory} />
       </View>
 
       {loading ? (
