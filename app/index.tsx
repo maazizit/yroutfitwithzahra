@@ -2,7 +2,7 @@ import { Redirect } from 'expo-router';
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { PulseView } from '@/components/anim';
-import { LogoMark } from '@/components/Logo';
+import { BrandLogo } from '@/components/Logo';
 import { useProfile } from '@/lib/profile';
 import { colors, serif } from '@/theme';
 
@@ -13,11 +13,8 @@ export default function Index() {
     return (
       <View style={styles.splash}>
         <PulseView minScale={0.96} maxScale={1.08} duration={700}>
-          <LogoMark size={72} />
+          <BrandLogo size={170} />
         </PulseView>
-        <Text style={styles.splashText}>
-          outfit <Text style={styles.splashWith}>with</Text> Zahra
-        </Text>
         <ActivityIndicator color={colors.accent} style={styles.spinner} />
       </View>
     );

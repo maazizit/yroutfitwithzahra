@@ -62,6 +62,8 @@ const CATEGORY_MAP = [
   [/jacket|coat|blazer|veste|manteau|gilet/i, 'Vestes'],
   [/belt|bag|scarf|ceinture|sac|bijou|accessor/i, 'Accessoires'],
 ];
+const MODEST_PATTERN =
+  /abaya|hijab|khimar|jilbab|kaftan|caftan|modest|maxi|longue|long sleeve|manches longues|tunic|tunique|palazzo|wide leg|oversized|oversize|loose|ample|cardigan long|kimono/i;
 const TAG_RULES = [
   [/wrap|portefeuille|cintr|belted|ceintur|bodycon|moulant/i, ['sablier']],
   [/a-line|évasé|evase|trapèze|trapeze|flare/i, ['poire', 'triangle_inverse']],
@@ -201,6 +203,7 @@ async function main() {
       awin_mid: idx.merchantId !== -1 ? cells[idx.merchantId] : null,
       tags: inferTags(haystack),
       category: inferCategory(haystack),
+      modest: MODEST_PATTERN.test(haystack),
     });
     if (rows.length >= 1000) break;
   }
@@ -213,17 +216,17 @@ async function main() {
   });
   await client.connect();
 
-  const cols = ['id', 'name', 'brand', 'price', 'original_price', 'currency', 'image', 'url', 'awin_mid', 'tags', 'category'];
+  const cols = ['id', 'name', 'brand', 'price', 'original_price', 'currency', 'image', 'url', 'awin_mid', 'tags', 'category', 'modest'];
   const values = [];
   const params = [];
   let p = 1;
   for (const row of rows) {
     values.push(
-      `($${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++})`,
+      `($${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++})`,
     );
     params.push(
       row.id, row.name, row.brand, row.price, row.original_price, row.currency,
-      row.image, row.url, row.awin_mid, row.tags, row.category,
+      row.image, row.url, row.awin_mid, row.tags, row.category, row.modest,
     );
   }
 
@@ -241,6 +244,7 @@ async function main() {
       awin_mid = EXCLUDED.awin_mid,
       tags = EXCLUDED.tags,
       category = EXCLUDED.category,
+      modest = EXCLUDED.modest,
       updated_at = now()
   `;
   await client.query(sql, params);

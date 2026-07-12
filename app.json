@@ -1,12 +1,13 @@
 {
   "expo": {
-    "name": "Outfit with Zahra",
+    "name": "YourOutfit WithZahra",
     "slug": "outfitwithzahra",
     "version": "1.0.0",
     "scheme": "owz",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "icon": "./assets/icon.png",
     "ios": {
       "supportsTablet": false
     },

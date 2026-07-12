@@ -1,0 +1,36 @@
+# Importe le flux produits Awin dans la table Supabase `products`.
+# Utilise les secrets GitHub : AWIN_FEED_URL, SUPABASE_DB_PASSWORD, SUPABASE_PROJECT_REF.
+#
+# ⚠️ Les secrets sont des "Environment secrets" : le job doit référencer le même
+# environnement que celui créé dans Settings → Environments. Si le tien ne
+# s'appelle pas "production", change la ligne `environment:` ci-dessous
+# (ou déplace les secrets dans Settings → Secrets and variables → Actions →
+# "Repository secrets" et supprime la ligne `environment:`).
+
+name: Sync Awin feed
+
+on:
+  schedule:
+    - cron: '0 6,18 * * *' # 2x par jour (06h et 18h UTC)
+  workflow_dispatch: {} # bouton "Run workflow" pour lancer à la main
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install pg
+        run: npm install --no-save pg
+
+      - name: Import Awin feed into Supabase
+        env:
+          AWIN_FEED_URL: ${{ secrets.AWIN_FEED_URL }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: node scripts/import-awin.js

@@ -1,4 +1,3 @@
-import { SAMPLE_PRODUCTS } from '@/data/sample-products';
 import { discountPercent } from './affiliate';
 import type { Morphology } from './morphology';
 import { ALL_MORPHOLOGIES } from './morphology';
@@ -45,27 +44,25 @@ function rowToProduct(row: ProductRow): Product {
   };
 }
 
-const FETCH_TIMEOUT_MS = 4000;
+const FETCH_TIMEOUT_MS = 10000;
 
 /**
- * Charge le catalogue : d'abord la table Supabase `products`
- * (remplie par le cron du flux Awin), sinon le catalogue de démonstration.
- * Si le réseau traîne (> 4 s), on affiche le catalogue de démonstration
- * plutôt que de laisser l'utilisatrice devant un spinner.
+ * Charge le catalogue depuis la table Supabase `products`,
+ * remplie par l'import du flux Awin (scripts/import-awin.js ou le
+ * workflow GitHub « Sync Awin feed »). Renvoie [] si la base est vide
+ * ou injoignable — l'écran affiche alors un état vide explicite.
  */
 export async function fetchProducts(): Promise<Product[]> {
   try {
-    const query = supabase.from('products').select('*').limit(200);
+    const query = supabase.from('products').select('*').limit(500);
     const timeout = new Promise<null>((resolve) =>
       setTimeout(() => resolve(null), FETCH_TIMEOUT_MS),
     );
     const result = await Promise.race([query, timeout]);
-    if (!result || result.error || !result.data || result.data.length === 0) {
-      return SAMPLE_PRODUCTS;
-    }
+    if (!result || result.error || !result.data) return [];
     return (result.data as ProductRow[]).map(rowToProduct);
   } catch {
-    return SAMPLE_PRODUCTS;
+    return [];
   }
 }
 

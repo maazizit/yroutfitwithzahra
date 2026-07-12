@@ -24,3 +24,6 @@ create policy "products_public_read"
   on public.products for select
   to anon, authenticated
   using (true);
+
+-- Mode Pudeur : colonne modest (ajout idempotent)
+alter table public.products add column if not exists modest boolean not null default false;

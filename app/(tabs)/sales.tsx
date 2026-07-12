@@ -94,8 +94,9 @@ export default function SalesScreen() {
           ListEmptyComponent={
             <View style={styles.center}>
               <Text style={styles.emptyText}>
-                Pas de vente privée dans ton budget aujourd'hui.{'\n'}Reviens vite, ça change tous
-                les jours ✨
+                {products.length === 0
+                  ? 'Ton catalogue se connecte aux marques ✨\nLance l’import Awin, puis tire pour rafraîchir.'
+                  : 'Pas de vente privée dans ton budget aujourd’hui.\nReviens vite, ça change tous les jours ✨'}
               </Text>
             </View>
           }

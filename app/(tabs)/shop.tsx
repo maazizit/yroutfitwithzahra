@@ -141,8 +141,9 @@ export default function ShopScreen() {
           ListEmptyComponent={
             <View style={styles.center}>
               <Text style={styles.emptyText}>
-                Aucun article dans ce budget pour l'instant.{'\n'}Augmente ton budget dans « Mon
-                style ».
+                {products.length === 0
+                  ? 'Ton catalogue se connecte aux marques ✨\nLance l’import Awin (workflow « Sync Awin feed » sur GitHub ou `node scripts/import-awin.js`), puis tire pour rafraîchir.'
+                  : 'Aucun article dans ce budget pour l’instant.\nAugmente ton budget dans « Mon style ».'}
               </Text>
             </View>
           }

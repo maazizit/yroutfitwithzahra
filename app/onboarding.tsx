@@ -5,7 +5,7 @@ import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FadeInView, PulseView, ScalePressable } from '@/components/anim';
 import { BudgetSlider } from '@/components/BudgetSlider';
-import { LogoMark } from '@/components/Logo';
+import { BrandLogo } from '@/components/Logo';
 import { MorphologyPicker } from '@/components/MorphologyPicker';
 import type { Morphology } from '@/lib/morphology';
 import { useProfile } from '@/lib/profile';
@@ -43,11 +43,8 @@ export default function Onboarding() {
         <FadeInView delay={0} dy={10}>
           <View style={styles.header}>
             <PulseView minScale={1} maxScale={1.04} duration={1600}>
-              <LogoMark size={64} />
+              <BrandLogo size={150} />
             </PulseView>
-            <Text style={styles.brandName}>
-              outfit <Text style={styles.brandWith}>with</Text> Zahra
-            </Text>
             <View style={styles.goldDivider} />
             <Text style={styles.slogan}>
               Tu es magnifique.{'\n'}Apprends juste à te mettre en valeur.

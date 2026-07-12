@@ -1,11 +1,27 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { colors, serif } from '@/theme';
 
+/** Logo officiel YourOutfit WithZahra (assets/) */
+const MARK = require('../../assets/mark.png');
+const FULL_LOGO = require('../../assets/logo.png');
+
+/** Logo complet (emblème + wordmark) — onboarding, splash. */
+export function BrandLogo({ size = 160 }: { size?: number }) {
+  return (
+    <Image
+      source={FULL_LOGO}
+      style={{ width: size, height: size, borderRadius: size / 8 }}
+      resizeMode="contain"
+      accessibilityLabel="YourOutfit WithZahra"
+    />
+  );
+}
+
 /**
  * Marque "Outfit with Zahra" — cintre minimaliste + fleur (zahra = fleur),
- * entièrement vectoriel.
+ * entièrement vectoriel (utilisé en secours).
  */
 export function LogoMark({ size = 40 }: { size?: number }) {
   return (
@@ -37,10 +53,10 @@ export function LogoMark({ size = 40 }: { size?: number }) {
 export function LogoHeader({ subtitle }: { subtitle?: string }) {
   return (
     <View style={styles.row}>
-      <LogoMark size={42} />
+      <Image source={MARK} style={styles.mark} resizeMode="contain" accessibilityLabel="Logo" />
       <View style={styles.textBlock}>
         <Text style={styles.wordmark}>
-          outfit <Text style={styles.with}>with</Text> Zahra
+          YourOutfit <Text style={styles.with}>with</Text> Zahra
         </Text>
         {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
       </View>
@@ -53,6 +69,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+  },
+  mark: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
   },
   textBlock: {
     flexDirection: 'column',
