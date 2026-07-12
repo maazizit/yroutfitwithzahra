@@ -108,6 +108,43 @@ function inferTags(text) {
   return [...tags].filter((t) => ALLOWED_TAGS.includes(t));
 }
 
+const SIZE_ALIASES = {
+  SMALL: 'S', MEDIUM: 'M', LARGE: 'L', XLARGE: 'XL',
+  T0: 'XS', T1: 'S', T2: 'M', T3: 'L', T4: 'XL', '3XL': 'XXL',
+};
+
+function normalizeSize(raw) {
+  const s = raw.trim().toUpperCase();
+  return SIZE_ALIASES[s] ?? s;
+}
+
+function parseSizesCell(raw) {
+  if (!raw?.trim()) return [];
+  return [...new Set(raw.split(/[,|/;]+/).map((part) => normalizeSize(part)).filter(Boolean))];
+}
+
+function inferSizesFromText(text) {
+  const found = [];
+  const re = /\b(XXS|XS|S|M|L|XL|XXL|3XL|T[0-4]|3[2-9]|4[0-8])\b/gi;
+  let match;
+  while ((match = re.exec(text)) !== null) found.push(normalizeSize(match[1]));
+  return [...new Set(found)];
+}
+
+function findSizeColumn(header) {
+  for (const name of ['fashion:size', 'size', 'fashion_size']) {
+    const i = header.indexOf(name);
+    if (i !== -1) return i;
+  }
+  return header.findIndex((h) => h.includes('size') && !h.includes('stock'));
+}
+
+function extractSizes(cells, sizeIdx, name, description) {
+  const fromColumn = sizeIdx !== -1 ? parseSizesCell(cells[sizeIdx] ?? '') : [];
+  if (fromColumn.length) return fromColumn;
+  return inferSizesFromText(`${name} ${description ?? ''}`);
+}
+
 async function main() {
   loadEnv();
   const feedUrl = process.env.AWIN_FEED_URL;
@@ -176,6 +213,7 @@ async function main() {
     description: col('description'),
     category: col('merchant_category'),
   };
+  const sizeIdx = findSizeColumn(header);
   if (idx.id === -1 || idx.name === -1 || idx.price === -1 || idx.deeplink === -1) {
     throw new Error(`Colonnes Awin manquantes. Header: ${header.join(', ')}`);
   }
@@ -190,6 +228,7 @@ async function main() {
     const haystack = `${cells[idx.name]} ${idx.description !== -1 ? cells[idx.description] : ''} ${
       idx.category !== -1 ? cells[idx.category] : ''
     }`;
+    const description = idx.description !== -1 ? cells[idx.description] : '';
 
     rows.push({
       id: `awin-${cells[idx.id]}`,
@@ -204,6 +243,7 @@ async function main() {
       tags: inferTags(haystack),
       category: inferCategory(haystack),
       modest: MODEST_PATTERN.test(haystack),
+      sizes: extractSizes(cells, sizeIdx, cells[idx.name], description),
     });
     if (rows.length >= 1000) break;
   }
@@ -216,17 +256,17 @@ async function main() {
   });
   await client.connect();
 
-  const cols = ['id', 'name', 'brand', 'price', 'original_price', 'currency', 'image', 'url', 'awin_mid', 'tags', 'category', 'modest'];
+  const cols = ['id', 'name', 'brand', 'price', 'original_price', 'currency', 'image', 'url', 'awin_mid', 'tags', 'category', 'modest', 'sizes'];
   const values = [];
   const params = [];
   let p = 1;
   for (const row of rows) {
     values.push(
-      `($${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++})`,
+      `($${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++})`,
     );
     params.push(
       row.id, row.name, row.brand, row.price, row.original_price, row.currency,
-      row.image, row.url, row.awin_mid, row.tags, row.category, row.modest,
+      row.image, row.url, row.awin_mid, row.tags, row.category, row.modest, row.sizes,
     );
   }
 
@@ -245,6 +285,7 @@ async function main() {
       tags = EXCLUDED.tags,
       category = EXCLUDED.category,
       modest = EXCLUDED.modest,
+      sizes = EXCLUDED.sizes,
       updated_at = now()
   `;
   await client.query(sql, params);

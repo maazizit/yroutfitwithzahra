@@ -1,4 +1,5 @@
 import { discountPercent } from './affiliate';
+import { matchesClothingSize } from './sizes';
 import type { Morphology } from './morphology';
 import { ALL_MORPHOLOGIES } from './morphology';
 import { supabase } from './supabase';
@@ -19,6 +20,7 @@ interface ProductRow {
   tags: string[] | null;
   category: string | null;
   modest: boolean | null;
+  sizes: string[] | null;
 }
 
 function rowToProduct(row: ProductRow): Product {
@@ -41,6 +43,7 @@ function rowToProduct(row: ProductRow): Product {
     tags,
     category,
     modest: row.modest === true,
+    sizes: row.sizes?.length ? row.sizes.map((s) => s.trim()).filter(Boolean) : [],
   };
 }
 
@@ -75,10 +78,15 @@ function respectsModesty(product: Product, profile: UserProfile): boolean {
   return !profile.modestMode || product.modest === true;
 }
 
-/** Flux principal : dans le budget, articles compatibles morpho en premier, puis prix croissant. */
+/** Flux principal : budget, pudeur, taille, morpho compatible en premier. */
 export function shoppingFeed(products: Product[], profile: UserProfile): Product[] {
   return products
-    .filter((p) => p.price <= profile.budget && respectsModesty(p, profile))
+    .filter(
+      (p) =>
+        p.price <= profile.budget &&
+        respectsModesty(p, profile) &&
+        matchesClothingSize(p.sizes ?? [], profile.clothingSize),
+    )
     .sort((a, b) => {
       const ma = matchesMorphology(a, profile.morphology) ? 1 : 0;
       const mb = matchesMorphology(b, profile.morphology) ? 1 : 0;
@@ -92,7 +100,10 @@ export function privateSalesFeed(products: Product[], profile: UserProfile): Pro
   return products
     .filter(
       (p) =>
-        (discountPercent(p) ?? 0) >= 30 && p.price <= profile.budget && respectsModesty(p, profile),
+        (discountPercent(p) ?? 0) >= 30 &&
+        p.price <= profile.budget &&
+        respectsModesty(p, profile) &&
+        matchesClothingSize(p.sizes ?? [], profile.clothingSize),
     )
     .sort((a, b) => {
       const ma = matchesMorphology(a, profile.morphology) ? 1 : 0;

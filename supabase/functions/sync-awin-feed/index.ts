@@ -69,10 +69,51 @@ function inferTags(text: string): string[] {
     if (pattern.test(text)) matched.forEach((t) => tags.add(t));
   }
   if (tags.size === 0) {
-    // Article neutre : visible pour toutes les silhouettes courantes.
     ['sablier', 'rectangle'].forEach((t) => tags.add(t));
   }
   return [...tags].filter((t) => ALLOWED_TAGS.includes(t));
+}
+
+const SIZE_ALIASES: Record<string, string> = {
+  SMALL: 'S', MEDIUM: 'M', LARGE: 'L', XLARGE: 'XL',
+  T0: 'XS', T1: 'S', T2: 'M', T3: 'L', T4: 'XL', '3XL': 'XXL',
+};
+
+function normalizeSize(raw: string): string {
+  const s = raw.trim().toUpperCase();
+  return SIZE_ALIASES[s] ?? s;
+}
+
+function parseSizesCell(raw: string): string[] {
+  if (!raw.trim()) return [];
+  return [...new Set(raw.split(/[,|/;]+/).map((part) => normalizeSize(part)).filter(Boolean))];
+}
+
+function inferSizesFromText(text: string): string[] {
+  const found: string[] = [];
+  const re = /\b(XXS|XS|S|M|L|XL|XXL|3XL|T[0-4]|3[2-9]|4[0-8])\b/gi;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(text)) !== null) found.push(normalizeSize(match[1]));
+  return [...new Set(found)];
+}
+
+function findSizeColumn(header: string[]): number {
+  for (const name of ['fashion:size', 'size', 'fashion_size']) {
+    const i = header.indexOf(name);
+    if (i !== -1) return i;
+  }
+  return header.findIndex((h) => h.includes('size') && !h.includes('stock'));
+}
+
+function extractSizes(
+  cells: string[],
+  sizeIdx: number,
+  name: string,
+  description: string,
+): string[] {
+  const fromColumn = sizeIdx !== -1 ? parseSizesCell(cells[sizeIdx] ?? '') : [];
+  if (fromColumn.length) return fromColumn;
+  return inferSizesFromText(`${name} ${description}`);
 }
 
 Deno.serve(async (req) => {
@@ -119,6 +160,7 @@ Deno.serve(async (req) => {
     description: col('description'),
     category: col('merchant_category'),
   };
+  const sizeIdx = findSizeColumn(header);
   if (idx.id === -1 || idx.name === -1 || idx.price === -1 || idx.deeplink === -1) {
     return new Response(
       JSON.stringify({ error: 'Colonnes Awin attendues manquantes', header }),
@@ -136,6 +178,7 @@ Deno.serve(async (req) => {
     const haystack = `${cells[idx.name]} ${idx.description !== -1 ? cells[idx.description] : ''} ${
       idx.category !== -1 ? cells[idx.category] : ''
     }`;
+    const description = idx.description !== -1 ? cells[idx.description] : '';
 
     rows.push({
       id: `awin-${cells[idx.id]}`,
@@ -150,6 +193,7 @@ Deno.serve(async (req) => {
       tags: inferTags(haystack),
       category: inferCategory(haystack),
       modest: MODEST_PATTERN.test(haystack),
+      sizes: extractSizes(cells, sizeIdx, cells[idx.name], description),
     });
     if (rows.length >= 1000) break; // garde-fou tier gratuit
   }

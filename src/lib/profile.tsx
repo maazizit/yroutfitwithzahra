@@ -41,6 +41,10 @@ function parseProfile(raw: string | null): UserProfile | null {
         morphology: parsed.morphology,
         budget: parsed.budget,
         modestMode: parsed.modestMode === true,
+        clothingSize:
+          typeof parsed.clothingSize === 'string' && parsed.clothingSize.length > 0
+            ? parsed.clothingSize
+            : null,
       } as UserProfile;
     }
     return null;

@@ -16,6 +16,7 @@ import { FilterChips } from '@/components/FilterChips';
 import { LogoHeader } from '@/components/Logo';
 import { ProductCard } from '@/components/ProductCard';
 import { morphologyLabel } from '@/lib/morphology';
+import { sizeLabel } from '@/lib/sizes';
 import { fetchProducts, shoppingFeed } from '@/lib/products';
 import { useProfile } from '@/lib/profile';
 import type { Category, Product } from '@/lib/types';
@@ -84,7 +85,8 @@ export default function ShopScreen() {
         >
           <Text style={styles.profilePillText}>
             {profile.modestMode ? '🧕 ' : ''}
-            {morphologyLabel(profile.morphology)} · ≤ {profile.budget} € ›
+            {morphologyLabel(profile.morphology)}
+            {profile.clothingSize ? ` · ${profile.clothingSize}` : ''} · ≤ {profile.budget} € ›
           </Text>
         </Pressable>
       </View>
@@ -97,6 +99,7 @@ export default function ShopScreen() {
             <Text style={styles.editorialAccent}>
               {profile.modestMode ? 'Pudeur 🧕 · ' : ''}
               {morphologyLabel(profile.morphology)}
+              {profile.clothingSize ? ` · ${sizeLabel(profile.clothingSize)}` : ''}
             </Text>
           </Text>
           <View style={styles.editorialLine} />
@@ -131,7 +134,7 @@ export default function ShopScreen() {
               <Text style={styles.emptyText}>
                 {products.length === 0
                   ? 'Ton catalogue se connecte aux marques ✨\nLance l’import Awin (workflow « Sync Awin feed » sur GitHub ou `node scripts/import-awin.js`), puis tire pour rafraîchir.'
-                  : 'Aucun article dans ce budget pour l’instant.\nAugmente ton budget dans « Mon style ».'}
+                  : 'Aucun article dans ce budget pour l’instant.\nAjuste ton budget ou ta taille dans « Mon style ».'}
               </Text>
             </View>
           }

@@ -17,6 +17,8 @@ export interface Product {
   category: Category;
   /** Convient au mode pudeur (char3i) : couvrant, ample, opaque */
   modest?: boolean;
+  /** Tailles disponibles (S, M, 38…) — vide si inconnu */
+  sizes?: string[];
 }
 
 export interface UserProfile {
@@ -24,4 +26,6 @@ export interface UserProfile {
   budget: number;
   /** Mode Pudeur : n'afficher que des pièces couvrantes et amples */
   modestMode: boolean;
+  /** Taille préférée — null = pas de filtre taille */
+  clothingSize: string | null;
 }

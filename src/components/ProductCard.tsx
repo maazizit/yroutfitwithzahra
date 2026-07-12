@@ -154,6 +154,9 @@ export function ProductCard({ product, userMorphology }: Props) {
         <Text style={styles.name} numberOfLines={2}>
           {product.name}
         </Text>
+        {product.sizes && product.sizes.length > 0 && (
+          <Text style={styles.sizes}>{product.sizes.slice(0, 4).join(' · ')}</Text>
+        )}
         <View style={styles.priceRow}>
           <Text style={styles.price}>{formatPrice(product.price, product.currency)}</Text>
           {product.originalPrice && discount !== null && (
@@ -299,6 +302,13 @@ const styles = StyleSheet.create({
     color: colors.ink,
     lineHeight: 19,
     minHeight: 38,
+  },
+  sizes: {
+    fontSize: 11,
+    color: colors.muted,
+    fontWeight: '600',
+    marginTop: -4,
+    marginBottom: 2,
   },
   priceRow: {
     flexDirection: 'row',

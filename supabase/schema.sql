@@ -13,14 +13,17 @@ create table if not exists public.products (
   tags text[] not null default '{}',
   category text not null default 'Hauts',
   modest boolean not null default false,
+  sizes text[] not null default '{}',
   updated_at timestamptz not null default now()
 );
 
 -- Si la table existe déjà sans la colonne (migration) :
 alter table public.products add column if not exists modest boolean not null default false;
+alter table public.products add column if not exists sizes text[] not null default '{}';
 
 create index if not exists products_price_idx on public.products (price);
 create index if not exists products_tags_idx on public.products using gin (tags);
+create index if not exists products_sizes_idx on public.products using gin (sizes);
 
 -- RLS : lecture publique (catalogue), écriture réservée au service_role (cron).
 alter table public.products enable row level security;

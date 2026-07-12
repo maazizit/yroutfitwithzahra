@@ -7,6 +7,7 @@ import { FadeInView, PulseView, ScalePressable } from '@/components/anim';
 import { BudgetSlider } from '@/components/BudgetSlider';
 import { BrandLogo } from '@/components/Logo';
 import { MorphologyPicker } from '@/components/MorphologyPicker';
+import { SizePicker } from '@/components/SizePicker';
 import type { Morphology } from '@/lib/morphology';
 import { useProfile } from '@/lib/profile';
 import { colors, radius, serif } from '@/theme';
@@ -18,6 +19,7 @@ export default function Onboarding() {
   const [morphology, setMorphology] = useState<Morphology | null>(null);
   const [budget, setBudget] = useState(30);
   const [modestMode, setModestMode] = useState(false);
+  const [clothingSize, setClothingSize] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const next = async () => {
@@ -28,7 +30,7 @@ export default function Onboarding() {
     if (!morphology || saving) return;
     setSaving(true);
     try {
-      await saveProfile({ morphology, budget, modestMode });
+      await saveProfile({ morphology, budget, modestMode, clothingSize });
       router.replace('/(tabs)/shop');
     } finally {
       setSaving(false);
@@ -79,6 +81,13 @@ export default function Onboarding() {
               <View style={styles.budgetCard}>
                 <BudgetSlider value={budget} onChange={setBudget} />
               </View>
+            </FadeInView>
+            <FadeInView delay={180}>
+              <Text style={styles.sizeTitle}>Ta taille habituelle ?</Text>
+              <Text style={styles.sizeSubtitle}>
+                On masquera les articles indisponibles dans ta taille. Laisse « Toutes » pour tout voir.
+              </Text>
+              <SizePicker value={clothingSize} onChange={setClothingSize} />
             </FadeInView>
             <FadeInView delay={240}>
               <View style={styles.modestCard}>
@@ -214,6 +223,21 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     paddingVertical: 28,
     paddingHorizontal: 20,
+  },
+  sizeTitle: {
+    fontFamily: serif,
+    fontSize: 17,
+    color: colors.ink,
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  sizeSubtitle: {
+    fontSize: 12.5,
+    color: colors.muted,
+    textAlign: 'center',
+    marginBottom: 4,
+    lineHeight: 17,
+    paddingHorizontal: 8,
   },
   modestCard: {
     marginTop: 14,
