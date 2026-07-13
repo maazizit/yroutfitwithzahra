@@ -48,55 +48,47 @@ cp .env.example .env   # déjà fait si tu utilises ce repo en local
 npx expo start         # scanne le QR code avec Expo Go
 ```
 
-## 🔌 Connexion Supabase + Awin + IA (à faire une fois)
+## 🔌 Connexion Supabase + Awin + IA
 
-1. **Table + sécurité** : ouvre le [SQL Editor](https://supabase.com/dashboard) de ton
-   projet et exécute `supabase/schema.sql`.
-2. **Fonctions IA** :
-   ```bash
-   supabase functions deploy tag-morphology
-   supabase functions deploy ask-zahra
-   supabase secrets set GEMINI_API_KEY=<clé_créée_sur_aistudio.google.com>
-   ```
-3. **Cron du flux Awin** (quand le programme Shein est approuvé) :
-   ```bash
-   supabase functions deploy sync-awin-feed
-   supabase secrets set AWIN_FEED_URL=<url_create-a-feed_awin>
-   ```
-   puis planifie le cron `pg_cron` (instructions en bas de `supabase/schema.sql`).
+Depuis l'ajout des workflows `supabase-migrate.yml` et `supabase-deploy-functions.yml`, **la table,
+les colonnes et les Edge Functions se déploient automatiquement à chaque push sur `main`** qui
+touche `supabase/migrations/**`, `supabase/schema.sql` ou `supabase/functions/**`. Plus besoin
+d'exécuter le SQL ou de déployer les fonctions à la main — il suffit de configurer les secrets une
+fois (voir le tableau plus bas), puis de pousser du code.
 
-### Option rapide (recommandée) — script automatique
+Le catalogue lui-même est importé par `sync-awin-feed.yml` (voir plus haut) — même logique : une
+fois les secrets configurés, tout tourne tout seul (2×/jour + sur demande via l'onglet **Actions**).
 
-```powershell
-# 1. Connexion Supabase CLI (ouvre le navigateur) — requis pour déployer les Edge Functions
-supabase login
+### Configurer les secrets (à faire une fois)
 
-# 2. Déploie table + Edge Functions + secrets
-#    (le schéma peut aussi passer par mot de passe PostgreSQL si pas encore fait)
-.\scripts\setup-backend.ps1 -DbPassword "TON_MDP_POSTGRES"
+GitHub → repo → **Settings → Secrets and variables → Actions** → onglet **Environments** →
+`production` (ou en Repository secrets si tu n'utilises pas d'environnement — voir la remarque en
+tête de chaque fichier `.github/workflows/*.yml`) :
 
-# Avec toutes les clés :
-.\scripts\setup-backend.ps1 -DbPassword "TON_MDP" -GeminiApiKey "AIza..." -AwinFeedUrl "https://productdata.awin.com/..."
-```
-
-> Le mot de passe PostgreSQL ne va **jamais** dans `.env` ni sur GitHub — uniquement en argument du script ou variable d'environnement locale.
-
-| Secret | Où l'obtenir |
-|---|---|
-| `GEMINI_API_KEY` | Gratuit sur [Google AI Studio](https://aistudio.google.com/apikey) — tier gratuit Gemini 2.0 Flash |
-| `AWIN_FEED_URL` | [Awin](https://ui.awin.com/user) → **Outils → Create-a-Feed** → format **CSV** → copier l'URL du flux |
+| Secret | Où l'obtenir | Utilisé par |
+|---|---|---|
+| `SUPABASE_DB_PASSWORD` | Dashboard Supabase → Settings → Database | Migrations SQL + import catalogue |
+| `SUPABASE_PROJECT_REF` | Dashboard Supabase → Settings → General (Reference ID) | Tous les workflows Supabase |
+| `SUPABASE_ACCESS_TOKEN` | [Dashboard → Account → Access Tokens](https://supabase.com/dashboard/account/tokens) | Déploiement des Edge Functions |
+| `GEMINI_API_KEY` | Gratuit sur [Google AI Studio](https://aistudio.google.com/apikey) | Tagging IA + Styliste IA + Zahra |
+| `AWIN_FEED_URL` ou `AWIN_FEEDS` | [Awin](https://ui.awin.com/user) → **Outils → Create-a-Feed** → CSV | Import catalogue (voir [`docs/multi-source-catalogue.md`](docs/multi-source-catalogue.md) pour plusieurs marchands) |
+| `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_KEY` | Dashboard Supabase → Settings → API | App mobile |
 
 > **Compte Awin `yroutfitwithzahra` (2982087)** : si Create-a-Feed est bloqué, complète d'abord le
-> profil éditeur (site web, espaces publicitaires, paiement) puis rejoins le programme **SHEIN**
+> profil éditeur (site web, espaces publicitaires, paiement) puis rejoins un programme mode
 > (Annonceurs → S'inscrire à des programmes).
 
-### Option manuelle (dashboard Supabase)
+### Développement local (optionnel)
 
-1. **Table** : [SQL Editor](https://supabase.com/dashboard/project/cuwtknywzfyvhuuvvrpd/sql/new) → coller et exécuter `supabase/schema.sql`.
-2. **IA** : [Edge Functions](https://supabase.com/dashboard/project/cuwtknywzfyvhuuvvrpd/functions) → déployer `tag-morphology` → [Secrets](https://supabase.com/dashboard/project/cuwtknywzfyvhuuvvrpd/functions/secrets) → `GEMINI_API_KEY`.
-3. **Catalogue Awin** : déployer `sync-awin-feed` → secret `AWIN_FEED_URL` → invoquer la fonction une fois.
+Pour tester en local sans attendre un push : copie `.env.example` en `.env`, remplis les valeurs, puis :
 
-Tant que la table `products` est vide, l'app affiche le catalogue de démonstration — elle reste utilisable sur mobile.
+```bash
+npm run import:awin    # importe le catalogue en local
+npm run audit:tags     # valide le tagging morphologique sur un échantillon
+```
+
+Le mot de passe PostgreSQL ne va **jamais** dans `.env` commité ni sur GitHub — le fichier `.env`
+est dans `.gitignore`.
 
 ### Variables GitHub Actions (Secrets)
 

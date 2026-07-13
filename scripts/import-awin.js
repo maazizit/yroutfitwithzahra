@@ -1,9 +1,21 @@
 /**
- * Import catalogue Awin → table Supabase `products`.
+ * Import catalogue Awin (un ou plusieurs flux) → table Supabase `products`.
  * Lit les variables depuis `.env` (ou process.env).
  *
  * Usage : node scripts/import-awin.js
- * Prérequis : AWIN_FEED_URL + SUPABASE_DB_PASSWORD dans .env
+ *
+ * Configuration des flux (deux options, une seule suffit) :
+ *   - AWIN_FEEDS   : plusieurs flux, un par ligne, format "clé=url"
+ *                    (ex. shein=https://... puis mango=https://... sur la ligne suivante)
+ *   - AWIN_FEED_URL : un seul flux (rétrocompatible — traité comme clé "awin",
+ *                     donc les ids déjà importés ne changent pas)
+ *
+ * Chaque produit est préfixé par la clé de son flux (ex. "shein-12345") pour
+ * éviter toute collision d'id entre marchands, et reçoit une colonne `source`
+ * pour pouvoir filtrer/purger un marchand proprement. Voir
+ * docs/multi-source-catalogue.md pour le détail.
+ *
+ * Prérequis : SUPABASE_DB_PASSWORD dans .env, + au moins un flux configuré.
  */
 const fs = require('fs');
 const path = require('path');
@@ -54,6 +66,41 @@ function loadEnv() {
   }
 }
 
+/**
+ * Détermine la liste des flux à importer.
+ * - AWIN_FEEDS (une ligne "clé=url" par marchand) a priorité si présente.
+ * - Sinon, AWIN_FEED_URL seul, avec la clé "awin" (rétrocompatible : mêmes
+ *   ids qu'avant ce refactor, pas de doublon au prochain import).
+ */
+function resolveFeeds() {
+  const multi = process.env.AWIN_FEEDS;
+  if (multi && multi.trim()) {
+    const feeds = [];
+    for (const line of multi.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eq = trimmed.indexOf('=');
+      if (eq === -1) continue;
+      const key = trimmed.slice(0, eq).trim().toLowerCase();
+      const url = trimmed.slice(eq + 1).trim();
+      if (key && url) feeds.push({ key, url });
+    }
+    if (feeds.length > 0) return feeds;
+  }
+  const single = process.env.AWIN_FEED_URL;
+  if (single && single.trim()) return [{ key: 'awin', url: single.trim() }];
+  return [];
+}
+
+/** Nom de marque à utiliser quand le flux ne fournit pas brand_name. */
+const SOURCE_BRAND_HINTS = {
+  shein: 'SHEIN',
+  zara: 'ZARA',
+  mango: 'MANGO',
+  hm: 'H&M',
+  handm: 'H&M',
+};
+
 const ALLOWED_TAGS = ['sablier', 'poire', 'pomme', 'rectangle', 'triangle_inverse'];
 const CATEGORY_MAP = [
   [/dress|robe/i, 'Robes'],
@@ -74,6 +121,7 @@ function isClothingProduct(name, merchantCategory) {
   if (NON_CLOTHING.test(haystack)) return false;
   return CLOTHING_HINT.test(haystack);
 }
+
 // Filet de secours utilisé seulement quand Gemini est indisponible/épuisé
 // (voir tagWithGemini). Volontairement plus large que la V1 pour capturer
 // les signaux d'épaule (poire/triangle_inverse) et les coupes neutres —
@@ -97,11 +145,6 @@ const TAG_RULES = [
   // Détails qui créent une courbe → rectangle
   [CURVE_CREATING, ['rectangle', 'pomme']],
 ];
-
-/** Vêtement dont le nom ne contient aucun signal de coupe (t-shirt basique, jean uni…). */
-function looksNeutral(text) {
-  return !TAG_RULES.some(([pattern]) => pattern.test(text));
-}
 
 function parseCsvLine(line) {
   const cells = [];
@@ -328,56 +371,40 @@ async function tagWithGemini(apiKey, description) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function main() {
-  loadEnv();
-  const feedUrl = process.env.AWIN_FEED_URL;
-  const dbPassword = process.env.SUPABASE_DB_PASSWORD;
-  const projectRef = process.env.SUPABASE_PROJECT_REF || 'cuwtknywzfyvhuuvvrpd';
+const MAX_ROWS_PER_FEED = 1000; // garde-fou tier gratuit
 
-  if (!feedUrl) {
-    console.error('AWIN_FEED_URL manquant dans .env');
-    console.error('Awin → Outils → Create-a-Feed → CSV → copier l\'URL du flux');
-    process.exit(1);
-  }
-  if (!dbPassword) {
-    console.error('SUPABASE_DB_PASSWORD manquant dans .env');
-    process.exit(1);
-  }
-
-  let csv;
+/** Télécharge et décompresse un flux Awin (CSV brut ou .gz), ou lit un fichier local (tests). */
+async function fetchFeedCsv(feedUrl) {
   const localPath = feedUrl.startsWith('file://')
     ? feedUrl.slice('file://'.length)
     : fs.existsSync(feedUrl) ? feedUrl : null;
 
   if (localPath) {
-    console.log(`Lecture du flux local : ${localPath}`);
+    console.log(`  Lecture du flux local : ${localPath}`);
     const raw = fs.readFileSync(localPath);
-    csv = localPath.endsWith('.gz')
-      ? (await gunzip(raw)).toString('utf8')
-      : raw.toString('utf8');
-  } else {
-    if (feedUrl.includes('/feedList')) {
-      throw new Error(
-        'AWIN_FEED_URL pointe vers feedList (page HTML). Copie une URL de la colonne URL dans datafeeds.csv',
-      );
-    }
-    console.log('Téléchargement du flux Awin...');
-    const { buffer, contentType } = await downloadFeed(feedUrl);
-    const isZip =
-      feedUrl.endsWith('.zip') ||
-      /application\/(x-)?zip/i.test(contentType);
-    if (isZip) {
-      throw new Error('Flux ZIP non supporté — utilise CSV ou CSV.GZ');
-    }
-
-    const isGzip =
-      feedUrl.includes('.gz') ||
-      feedUrl.includes('compression/gzip') ||
-      contentType.includes('gzip') ||
-      (buffer.length >= 2 && buffer[0] === 0x1f && buffer[1] === 0x8b);
-    csv = isGzip ? (await gunzip(buffer)).toString('utf8') : buffer.toString('utf8');
+    return localPath.endsWith('.gz') ? (await gunzip(raw)).toString('utf8') : raw.toString('utf8');
   }
 
+  if (feedUrl.includes('/feedList')) {
+    throw new Error(
+      'URL pointe vers feedList (page HTML). Copie une URL de la colonne URL dans datafeeds.csv',
+    );
+  }
+  console.log('  Téléchargement...');
+  const { buffer, contentType } = await downloadFeed(feedUrl);
+  const isZip = feedUrl.endsWith('.zip') || /application\/(x-)?zip/i.test(contentType);
+  if (isZip) throw new Error('Flux ZIP non supporté — utilise CSV ou CSV.GZ');
+
+  const isGzip =
+    feedUrl.includes('.gz') ||
+    feedUrl.includes('compression/gzip') ||
+    contentType.includes('gzip') ||
+    (buffer.length >= 2 && buffer[0] === 0x1f && buffer[1] === 0x8b);
+  return isGzip ? (await gunzip(buffer)).toString('utf8') : buffer.toString('utf8');
+}
+
+/** Parse le CSV d'un flux en lignes produits prêtes à taguer/insérer. */
+function parseFeedRows(csv, sourceKey) {
   const lines = csv.split(/\r?\n/).filter((l) => l.trim().length > 0);
   if (lines.length < 2) throw new Error('Flux vide');
 
@@ -399,9 +426,10 @@ async function main() {
   const sizeIdx = findSizeColumn(header);
   const colourIdx = findColourColumn(header);
   if (idx.id === -1 || idx.name === -1 || idx.price === -1 || idx.deeplink === -1) {
-    throw new Error(`Colonnes Awin manquantes. Header: ${header.join(', ')}`);
+    throw new Error(`Colonnes Awin manquantes pour "${sourceKey}". Header: ${header.join(', ')}`);
   }
 
+  const fallbackBrand = SOURCE_BRAND_HINTS[sourceKey] ?? sourceKey.toUpperCase();
   const rows = [];
   for (const line of lines.slice(1)) {
     const cells = parseCsvLine(line);
@@ -416,9 +444,10 @@ async function main() {
     const haystack = `${cells[idx.name]} ${description} ${merchantCat}`;
 
     rows.push({
-      id: `awin-${cells[idx.id]}`,
+      id: `${sourceKey}-${cells[idx.id]}`,
+      source: sourceKey,
       name: cells[idx.name].slice(0, 200),
-      brand: idx.brand !== -1 && cells[idx.brand] ? cells[idx.brand].toUpperCase() : 'MODE',
+      brand: idx.brand !== -1 && cells[idx.brand] ? cells[idx.brand].toUpperCase() : fallbackBrand,
       price,
       original_price: !Number.isNaN(rrp) && rrp > price ? rrp : null,
       currency: idx.currency !== -1 && cells[idx.currency] ? cells[idx.currency] : 'EUR',
@@ -432,91 +461,76 @@ async function main() {
       colours: extractColours(cells, colourIdx, cells[idx.name], description),
       gender: inferGender(haystack),
     });
-    if (rows.length >= 1000) break;
+    if (rows.length >= MAX_ROWS_PER_FEED) break;
   }
+  return rows;
+}
 
-  if (rows.length === 0) {
-    console.warn('Aucun vêtement trouvé dans ce flux — essaie un flux mode (ex. Bodycross FR dans datafeeds.csv)');
-  }
+/**
+ * Tague les lignes via Gemini (avec cache tag_source + quota partagé entre
+ * tous les flux du run — `budget` est un objet muté par référence pour que
+ * la limite totale s'applique sur l'ensemble de l'import, pas par flux).
+ */
+async function tagRows(client, rows, geminiKey, budget) {
+  if (rows.length === 0) return;
+  const { rows: existing } = await client.query(
+    `SELECT id, tags, category, tag_source FROM public.products WHERE id = ANY($1)`,
+    [rows.map((r) => r.id)],
+  );
+  const cached = new Map(existing.map((r) => [r.id, r]));
 
-  console.log(`${rows.length} vêtements parsés — insertion dans Supabase...`);
-
-  const client = new Client({
-    connectionString: `postgresql://postgres:${encodeURIComponent(dbPassword)}@db.${projectRef}.supabase.co:5432/postgres`,
-    ssl: { rejectUnauthorized: false },
-  });
-  await client.connect();
-
-  // --- Tagging morphologique via Gemini (source de vérité), avec cache et
-  // repli sur l'heuristique. On ne re-tague jamais un produit déjà tagué
-  // par Gemini lors d'un run précédent (économise le quota gratuit).
-  const geminiKey = process.env.GEMINI_API_KEY;
-  const tagLimit = Number(process.env.GEMINI_TAG_LIMIT) || 200;
-  if (rows.length > 0) {
-    const { rows: existing } = await client.query(
-      `SELECT id, tags, category, tag_source FROM public.products WHERE id = ANY($1)`,
-      [rows.map((r) => r.id)],
-    );
-    const cached = new Map(existing.map((r) => [r.id, r]));
-
-    let geminiCalls = 0;
-    let geminiFailures = 0;
-    for (const row of rows) {
-      const prev = cached.get(row.id);
-      if (prev?.tag_source === 'gemini') {
-        // Déjà tagué par Gemini précédemment : on garde tel quel.
-        row.tags = prev.tags;
-        row.category = prev.category;
-        row.tag_source = 'gemini';
-        continue;
-      }
-      if (!geminiKey || geminiCalls >= tagLimit) {
-        row.tag_source = 'heuristic';
-        continue;
-      }
-      geminiCalls += 1;
-      const description = `${row.name}`;
-      const result = await tagWithGemini(geminiKey, description);
-      if (result) {
-        row.tags = result.tags.length > 0 ? result.tags : ALLOWED_TAGS.slice();
-        if (result.category) row.category = result.category;
-        row.tag_source = 'gemini';
-      } else {
-        geminiFailures += 1;
-        row.tag_source = 'heuristic';
-      }
-      await sleep(150); // reste sous les limites de débit du tier gratuit
+  let calls = 0;
+  let failures = 0;
+  for (const row of rows) {
+    const prev = cached.get(row.id);
+    if (prev?.tag_source === 'gemini') {
+      row.tags = prev.tags;
+      row.category = prev.category;
+      row.tag_source = 'gemini';
+      continue;
     }
-    if (geminiKey) {
-      console.log(
-        `Tagging Gemini : ${geminiCalls - geminiFailures}/${geminiCalls} réussis` +
-          (rows.length - geminiCalls > 0
-            ? `, ${rows.length - geminiCalls} article(s) laissés en heuristique (cache ou quota)`
-            : ''),
-      );
+    if (!geminiKey || budget.remaining <= 0) {
+      row.tag_source = 'heuristic';
+      continue;
+    }
+    calls += 1;
+    budget.remaining -= 1;
+    const result = await tagWithGemini(geminiKey, row.name);
+    if (result) {
+      row.tags = result.tags.length > 0 ? result.tags : ALLOWED_TAGS.slice();
+      if (result.category) row.category = result.category;
+      row.tag_source = 'gemini';
     } else {
-      console.log('GEMINI_API_KEY absente : tagging heuristique uniquement (voir audit-tags.js).');
+      failures += 1;
+      row.tag_source = 'heuristic';
     }
+    await sleep(150); // reste sous les limites de débit du tier gratuit
   }
+  if (geminiKey && calls > 0) {
+    console.log(`  Tagging Gemini : ${calls - failures}/${calls} réussis`);
+  }
+}
 
-  const cols = ['id', 'name', 'brand', 'price', 'original_price', 'currency', 'image', 'url', 'awin_mid', 'tags', 'category', 'modest', 'sizes', 'colours', 'gender', 'tag_source'];
+const UPSERT_COLS = [
+  'id', 'name', 'brand', 'price', 'original_price', 'currency', 'image', 'url', 'awin_mid',
+  'tags', 'category', 'modest', 'sizes', 'colours', 'gender', 'tag_source', 'source',
+];
+
+async function upsertRows(client, rows) {
+  if (rows.length === 0) return;
   const values = [];
   const params = [];
   let p = 1;
   for (const row of rows) {
-    values.push(
-      `($${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++})`,
-    );
+    values.push(`(${UPSERT_COLS.map(() => `$${p++}`).join(',')})`);
     params.push(
       row.id, row.name, row.brand, row.price, row.original_price, row.currency,
-      row.image, row.url, row.awin_mid, row.tags, row.category, row.modest, row.sizes, row.colours, row.gender,
-      row.tag_source ?? 'heuristic',
+      row.image, row.url, row.awin_mid, row.tags, row.category, row.modest, row.sizes,
+      row.colours, row.gender, row.tag_source ?? 'heuristic', row.source,
     );
   }
-
-  if (rows.length > 0) {
-    const sql = `
-    INSERT INTO public.products (${cols.join(', ')})
+  const sql = `
+    INSERT INTO public.products (${UPSERT_COLS.join(', ')})
     VALUES ${values.join(', ')}
     ON CONFLICT (id) DO UPDATE SET
       name = EXCLUDED.name,
@@ -534,9 +548,60 @@ async function main() {
       colours = EXCLUDED.colours,
       gender = EXCLUDED.gender,
       tag_source = EXCLUDED.tag_source,
+      source = EXCLUDED.source,
       updated_at = now()
   `;
-    await client.query(sql, params);
+  await client.query(sql, params);
+}
+
+async function main() {
+  loadEnv();
+  const feeds = resolveFeeds();
+  const dbPassword = process.env.SUPABASE_DB_PASSWORD;
+  const projectRef = process.env.SUPABASE_PROJECT_REF || 'cuwtknywzfyvhuuvvrpd';
+
+  if (feeds.length === 0) {
+    console.error('Aucun flux configuré : renseigne AWIN_FEEDS (multi-marchands) ou AWIN_FEED_URL dans .env');
+    console.error("Awin → Outils → Create-a-Feed → CSV → copier l'URL du flux");
+    process.exit(1);
+  }
+  if (!dbPassword) {
+    console.error('SUPABASE_DB_PASSWORD manquant dans .env');
+    process.exit(1);
+  }
+
+  const client = new Client({
+    connectionString: `postgresql://postgres:${encodeURIComponent(dbPassword)}@db.${projectRef}.supabase.co:5432/postgres`,
+    ssl: { rejectUnauthorized: false },
+  });
+  await client.connect();
+
+  const geminiKey = process.env.GEMINI_API_KEY;
+  const budget = { remaining: Number(process.env.GEMINI_TAG_LIMIT) || 200 };
+  if (!geminiKey) {
+    console.log('GEMINI_API_KEY absente : tagging heuristique uniquement (voir audit-tags.js).');
+  }
+
+  console.log(`${feeds.length} flux à importer : ${feeds.map((f) => f.key).join(', ')}`);
+
+  let totalImported = 0;
+  for (const feed of feeds) {
+    console.log(`\n— Flux "${feed.key}" —`);
+    try {
+      const csv = await fetchFeedCsv(feed.url);
+      const rows = parseFeedRows(csv, feed.key);
+      if (rows.length === 0) {
+        console.warn(`  Aucun vêtement trouvé pour "${feed.key}" — flux vide ou hors sujet mode ?`);
+        continue;
+      }
+      console.log(`  ${rows.length} vêtements parsés`);
+      await tagRows(client, rows, geminiKey, budget);
+      await upsertRows(client, rows);
+      totalImported += rows.length;
+    } catch (e) {
+      // Un flux en panne ne doit pas empêcher les autres marchands d'être importés.
+      console.error(`  Échec sur "${feed.key}" : ${e.message}`);
+    }
   }
 
   await client.query(`
@@ -546,11 +611,15 @@ async function main() {
   `);
   await client.end();
 
-  console.log(`Import terminé : ${rows.length} articles dans products`);
+  console.log(`\nImport terminé : ${totalImported} article(s) au total sur ${feeds.length} flux.`);
 }
 
-main().catch((e) => {
-  console.error('Échec import :', e.message);
-  if (e.cause?.message) console.error('Cause :', e.cause.message);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((e) => {
+    console.error('Échec import :', e.message);
+    if (e.cause?.message) console.error('Cause :', e.cause.message);
+    process.exit(1);
+  });
+}
+
+module.exports = { resolveFeeds, parseFeedRows, inferTags, inferCategory };

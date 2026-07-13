@@ -1,0 +1,52 @@
+# Applique automatiquement les migrations SQL (supabase/migrations/*.sql)
+# sur la base Supabase à chaque changement poussé sur main.
+# Toutes les migrations sont écrites en idempotent (`if not exists`,
+# `add column if not exists`...), donc rejouer tout le dossier à chaque run
+# est sûr — pas besoin de suivre "quelle migration a déjà tourné".
+#
+# Secrets utilisés : SUPABASE_DB_PASSWORD, SUPABASE_PROJECT_REF
+# (mêmes secrets que sync-awin-feed.yml — voir ce fichier pour la remarque
+# sur les "Environment secrets").
+
+name: Supabase — migrate database
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/schema.sql'
+  workflow_dispatch: {}
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install psql
+        run: sudo apt-get update -y && sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Run migrations
+        env:
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          set -e
+          if [ -z "$PGPASSWORD" ] || [ -z "$PROJECT_REF" ]; then
+            echo "SUPABASE_DB_PASSWORD / SUPABASE_PROJECT_REF manquants — configure les secrets d'environnement." >&2
+            exit 1
+          fi
+          CONN="host=db.$PROJECT_REF.supabase.co port=5432 dbname=postgres user=postgres sslmode=require"
+          shopt -s nullglob
+          files=(supabase/migrations/*.sql)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "Aucune migration à appliquer."
+            exit 0
+          fi
+          for f in "${files[@]}"; do
+            echo "→ $f"
+            psql "$CONN" -v ON_ERROR_STOP=1 -f "$f"
+          done
+          echo "Migrations appliquées : ${#files[@]} fichier(s)."

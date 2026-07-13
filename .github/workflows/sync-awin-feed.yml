@@ -1,7 +1,9 @@
-# Importe le flux produits Awin dans la table Supabase `products`.
-# Utilise les secrets GitHub : AWIN_FEED_URL, SUPABASE_DB_PASSWORD, SUPABASE_PROJECT_REF,
+# Importe le(s) flux produits Awin dans la table Supabase `products`.
+# Utilise les secrets GitHub : AWIN_FEED_URL (un seul marchand) ou AWIN_FEEDS
+# (plusieurs, prioritaire — une ligne "clé=url" par marchand, voir
+# docs/multi-source-catalogue.md), SUPABASE_DB_PASSWORD, SUPABASE_PROJECT_REF,
 # GEMINI_API_KEY (optionnel — sans lui, le tagging retombe sur l'heuristique par mots-clés,
-# moins fiable : voir l'audit du tagging morphologique).
+# moins fiable : voir docs/tagging-morphologie.md).
 #
 # ⚠️ Les secrets sont des "Environment secrets" : le job doit référencer le même
 # environnement que celui créé dans Settings → Environments. Si le tien ne
@@ -30,9 +32,10 @@ jobs:
       - name: Install pg
         run: npm install --no-save pg
 
-      - name: Import Awin feed into Supabase
+      - name: Import Awin feed(s) into Supabase
         env:
           AWIN_FEED_URL: ${{ secrets.AWIN_FEED_URL }}
+          AWIN_FEEDS: ${{ secrets.AWIN_FEEDS }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

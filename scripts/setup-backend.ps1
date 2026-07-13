@@ -3,6 +3,11 @@
 .SYNOPSIS
   Configure Supabase (schéma + Edge Functions) et secrets Awin / Gemini pour Outfit with Zahra.
 
+  ⚠️ Optionnel depuis l'ajout de .github/workflows/supabase-migrate.yml et
+  supabase-deploy-functions.yml : un push sur main suffit maintenant pour
+  appliquer les migrations et déployer les fonctions. Ce script reste utile
+  pour un setup initial local ou un nouveau projet Supabase.
+
 .USAGE
   1. supabase login
   2. .\scripts\setup-backend.ps1
@@ -61,18 +66,25 @@ if (-not (Test-Path ".env")) {
 Write-Host "==> Liaison au projet Supabase $ProjectRef..." -ForegroundColor Cyan
 supabase link --project-ref $ProjectRef
 
-Write-Host "==> Application du schéma (migrations)..." -ForegroundColor Cyan
+Write-Host "==> Application des migrations (supabase/migrations/*.sql, dans l'ordre)..." -ForegroundColor Cyan
 $pwd = if ($DbPassword) { $DbPassword } else { $env:SUPABASE_DB_PASSWORD }
 if ($pwd) {
   $env:SUPABASE_DB_PASSWORD = $pwd
-  node -e "const { Client } = require('pg'); const fs = require('fs'); const sql = fs.readFileSync('supabase/migrations/20260712150000_init_products.sql','utf8'); const client = new Client({ connectionString: 'postgresql://postgres:' + process.env.SUPABASE_DB_PASSWORD + '@db.$ProjectRef.supabase.co:5432/postgres', ssl: { rejectUnauthorized: false } }); client.connect().then(() => client.query(sql)).then(() => client.end()).then(() => console.log('Schema OK via PostgreSQL')).catch(e => { console.error(e.message); process.exit(1); });"
+  $migrations = Get-ChildItem -Path "supabase/migrations" -Filter "*.sql" | Sort-Object Name
+  foreach ($m in $migrations) {
+    Write-Host "    -> $($m.Name)" -ForegroundColor DarkCyan
+    node -e "const { Client } = require('pg'); const fs = require('fs'); const sql = fs.readFileSync('$($m.FullName -replace '\\','/')','utf8'); const client = new Client({ connectionString: 'postgresql://postgres:' + encodeURIComponent(process.env.SUPABASE_DB_PASSWORD) + '@db.$ProjectRef.supabase.co:5432/postgres', ssl: { rejectUnauthorized: false } }); client.connect().then(() => client.query(sql)).then(() => client.end()).catch(e => { console.error(e.message); process.exit(1); });"
+  }
+  Write-Host "    Migrations OK ($($migrations.Count) fichier(s))" -ForegroundColor Green
 } else {
   supabase db push
 }
 
-Write-Host "==> Déploiement des Edge Functions..." -ForegroundColor Cyan
-supabase functions deploy tag-morphology --no-verify-jwt
-supabase functions deploy sync-awin-feed --no-verify-jwt
+Write-Host "==> Déploiement des Edge Functions (supabase/functions/*)..." -ForegroundColor Cyan
+Get-ChildItem -Path "supabase/functions" -Directory | ForEach-Object {
+  Write-Host "    -> $($_.Name)" -ForegroundColor DarkCyan
+  supabase functions deploy $_.Name --no-verify-jwt
+}
 
 if ($GeminiApiKey) {
   Write-Host "==> Secret GEMINI_API_KEY..." -ForegroundColor Cyan
@@ -88,8 +100,9 @@ if ($AwinFeedUrl) {
   Write-Host "==> Import initial du catalogue Awin..." -ForegroundColor Cyan
   node scripts/import-awin.js
 } else {
-  Write-Host "    AWIN_FEED_URL non fournie — catalogue démo jusqu'à configuration." -ForegroundColor Yellow
-  Write-Host "    Awin → Toolbox → Create-a-Feed → format CSV → copier l'URL du flux." -ForegroundColor Yellow
+  Write-Host "    AWIN_FEED_URL non fournie — le catalogue restera vide tant qu'un flux n'est pas configuré." -ForegroundColor Yellow
+  Write-Host "    Awin -> Toolbox -> Create-a-Feed -> format CSV -> copier l'URL du flux." -ForegroundColor Yellow
+  Write-Host "    Plusieurs marchands ? Utilise AWIN_FEEDS (voir docs/multi-source-catalogue.md)." -ForegroundColor Yellow
 }
 
 Write-Host ""
