@@ -61,9 +61,10 @@ async function testConnection(label, config) {
       return false;
     }
   }
-  const client = new Client({ ...config, connectionTimeoutMillis: 15000 });
   const started = Date.now();
+  let client;
   try {
+    client = new Client({ ...config, connectionTimeoutMillis: 15000 });
     await client.connect();
     const ms = Date.now() - started;
     const info = await client.query(
@@ -86,7 +87,13 @@ async function testConnection(label, config) {
     return true;
   } catch (err) {
     console.error('❌ Échec de connexion');
-    if (err.code === 'ENOTFOUND') {
+    if (err.code === 'ERR_INVALID_URL' || err instanceof TypeError) {
+      console.error('   URL mal formée. Vérifie dans .env :');
+      console.error('   • le format complet : postgresql://USER:PASSWORD@HOST:PORT/postgres');
+      console.error('   • le "@" entre le mot de passe et l\'hôte n\'a pas été perdu au copier-coller');
+      console.error('   • si ton mot de passe contient @ # / % ? : ou un espace, encode-le avec');
+      console.error('     encodeURIComponent(...) avant de le mettre dans l\'URL');
+    } else if (err.code === 'ENOTFOUND') {
       console.error('   Hôte introuvable — vérifie le nom d\'hôte.');
     } else if (err.code === '28P01') {
       console.error('   Mot de passe incorrect (28P01)');
@@ -100,6 +107,7 @@ async function testConnection(label, config) {
       console.error(`   ${err.message}`);
       if (err.code) console.error(`   Code : ${err.code}`);
     }
+    if (!client) return false;
     try {
       await client.end();
     } catch {
