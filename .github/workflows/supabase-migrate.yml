@@ -4,9 +4,7 @@
 # `add column if not exists`...), donc rejouer tout le dossier à chaque run
 # est sûr — pas besoin de suivre "quelle migration a déjà tourné".
 #
-# Secrets utilisés : SUPABASE_DB_PASSWORD, SUPABASE_PROJECT_REF
-# (mêmes secrets que sync-awin-feed.yml — voir ce fichier pour la remarque
-# sur les "Environment secrets").
+# Secrets utilisés (Environment "prod") : SUPABASE_DB_PASSWORD, SUPABASE_PROJECT_REF.
 
 name: Supabase — migrate database
 
@@ -21,7 +19,7 @@ on:
 jobs:
   migrate:
     runs-on: ubuntu-latest
-    environment: production
+    environment: prod
     steps:
       - uses: actions/checkout@v4
 
