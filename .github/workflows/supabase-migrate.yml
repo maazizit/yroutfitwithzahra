@@ -4,7 +4,7 @@
 # `add column if not exists`...), donc rejouer tout le dossier à chaque run
 # est sûr — pas besoin de suivre "quelle migration a déjà tourné".
 #
-# Secrets utilisés (Environment "prod") : SUPABASE_DB_PASSWORD, SUPABASE_PROJECT_REF.
+# Secrets utilisés (Repository secrets) : SUPABASE_DB_PASSWORD, SUPABASE_PROJECT_REF.
 
 name: Supabase — migrate database
 
@@ -19,7 +19,6 @@ on:
 jobs:
   migrate:
     runs-on: ubuntu-latest
-    environment: prod
     steps:
       - uses: actions/checkout@v4
 

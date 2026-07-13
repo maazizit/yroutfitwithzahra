@@ -5,10 +5,9 @@
 # GEMINI_API_KEY (optionnel — sans lui, le tagging retombe sur l'heuristique par mots-clés,
 # moins fiable : voir docs/tagging-morphologie.md).
 #
-# Les secrets sont des "Environment secrets" sous l'environnement "prod"
-# (Settings → Environments → prod). Si tu renommes cet environnement,
-# mets à jour la ligne `environment:` ci-dessous dans les 3 workflows
-# Supabase/Awin.
+# Secrets attendus en "Repository secrets" (Settings → Secrets and variables
+# → Actions → onglet Secrets, PAS dans un Environment) — évite les échecs
+# silencieux si le nom d'un environnement ne correspond pas exactement.
 
 name: Sync Awin feed
 
@@ -20,7 +19,6 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    environment: prod
     steps:
       - uses: actions/checkout@v4
 
