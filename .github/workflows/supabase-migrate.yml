@@ -4,7 +4,13 @@
 # `add column if not exists`...), donc rejouer tout le dossier à chaque run
 # est sûr — pas besoin de suivre "quelle migration a déjà tourné".
 #
-# Secrets utilisés (Environment "prod") : SUPABASE_DB_PASSWORD, SUPABASE_PROJECT_REF.
+# Secrets utilisés (Environment "prod") :
+#   SUPABASE_DB_URL (recommandé) — connexion "Session pooler" copiée depuis
+#     Supabase → Connect → Session pooler (compatible IPv4 : la connexion
+#     directe db.<ref>.supabase.co est IPv6-only et injoignable depuis les
+#     runners GitHub Actions — "Network is unreachable").
+#   ou, à défaut : SUPABASE_DB_PASSWORD + SUPABASE_PROJECT_REF (connexion
+#     directe — ne fonctionnera pas en CI sans IPv4 add-on Supabase).
 
 name: Supabase — migrate database
 
@@ -28,15 +34,19 @@ jobs:
 
       - name: Run migrations
         env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
           PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
           PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
         run: |
           set -e
-          if [ -z "$PGPASSWORD" ] || [ -z "$PROJECT_REF" ]; then
-            echo "SUPABASE_DB_PASSWORD / SUPABASE_PROJECT_REF manquants — configure les secrets d'environnement." >&2
+          if [ -n "$DB_URL" ]; then
+            CONN="$DB_URL"
+          elif [ -n "$PGPASSWORD" ] && [ -n "$PROJECT_REF" ]; then
+            CONN="host=db.$PROJECT_REF.supabase.co port=5432 dbname=postgres user=postgres sslmode=require"
+          else
+            echo "SUPABASE_DB_URL (recommandé) ou SUPABASE_DB_PASSWORD+SUPABASE_PROJECT_REF manquants." >&2
             exit 1
           fi
-          CONN="host=db.$PROJECT_REF.supabase.co port=5432 dbname=postgres user=postgres sslmode=require"
           shopt -s nullglob
           files=(supabase/migrations/*.sql)
           if [ ${#files[@]} -eq 0 ]; then

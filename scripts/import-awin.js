@@ -554,26 +554,46 @@ async function upsertRows(client, rows) {
   await client.query(sql, params);
 }
 
+/**
+ * Connexion Postgres : privilégie SUPABASE_DB_URL (Session pooler, IPv4 —
+ * copié depuis Supabase → Connect → Session pooler) si présente, sinon
+ * retombe sur la connexion directe db.<ref>.supabase.co construite depuis
+ * SUPABASE_DB_PASSWORD + SUPABASE_PROJECT_REF.
+ *
+ * ⚠️ La connexion directe est IPv6-only côté Supabase depuis 2024 et
+ * échoue avec "Network is unreachable" sur les runners GitHub Actions
+ * (pas d'IPv6). En CI, configure SUPABASE_DB_URL.
+ */
+function resolveDbConnection() {
+  const dbUrl = process.env.SUPABASE_DB_URL;
+  if (dbUrl) return { connectionString: dbUrl, ssl: { rejectUnauthorized: false } };
+
+  const dbPassword = process.env.SUPABASE_DB_PASSWORD;
+  const projectRef = process.env.SUPABASE_PROJECT_REF || 'cuwtknywzfyvhuuvvrpd';
+  if (!dbPassword) return null;
+  return {
+    connectionString: `postgresql://postgres:${encodeURIComponent(dbPassword)}@db.${projectRef}.supabase.co:5432/postgres`,
+    ssl: { rejectUnauthorized: false },
+  };
+}
+
 async function main() {
   loadEnv();
   const feeds = resolveFeeds();
-  const dbPassword = process.env.SUPABASE_DB_PASSWORD;
-  const projectRef = process.env.SUPABASE_PROJECT_REF || 'cuwtknywzfyvhuuvvrpd';
 
   if (feeds.length === 0) {
     console.error('Aucun flux configuré : renseigne AWIN_FEEDS (multi-marchands) ou AWIN_FEED_URL dans .env');
     console.error("Awin → Outils → Create-a-Feed → CSV → copier l'URL du flux");
     process.exit(1);
   }
-  if (!dbPassword) {
-    console.error('SUPABASE_DB_PASSWORD manquant dans .env');
+
+  const dbConfig = resolveDbConnection();
+  if (!dbConfig) {
+    console.error('SUPABASE_DB_URL (recommandé) ou SUPABASE_DB_PASSWORD manquant dans .env');
     process.exit(1);
   }
 
-  const client = new Client({
-    connectionString: `postgresql://postgres:${encodeURIComponent(dbPassword)}@db.${projectRef}.supabase.co:5432/postgres`,
-    ssl: { rejectUnauthorized: false },
-  });
+  const client = new Client(dbConfig);
   await client.connect();
 
   const geminiKey = process.env.GEMINI_API_KEY;
