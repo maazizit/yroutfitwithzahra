@@ -33,3 +33,4 @@ yarn-error.*
 .env.*.local
 supabase/.env
 datafeeds.csv
+audit-tags-result.json

@@ -6,12 +6,16 @@ export interface MorphoTagResult {
   tags: Morphology[];
   category: string;
   confidence: number;
+  /** Présent uniquement si `debug: true` a été passé — texte brut renvoyé par Gemini. */
+  debugRawText?: string;
 }
 
 interface TagGarmentInput {
   description?: string;
   imageBase64?: string;
   mimeType?: string;
+  /** Renvoie en plus le texte brut de Gemini — pour validation manuelle avant de scaler. */
+  debug?: boolean;
 }
 
 /**
@@ -48,5 +52,6 @@ export async function tagGarment(input: TagGarmentInput): Promise<MorphoTagResul
     tags,
     category: typeof raw.category === 'string' ? raw.category : 'Inconnu',
     confidence: typeof raw.confidence === 'number' ? raw.confidence : 0,
+    debugRawText: typeof raw.debugRawText === 'string' ? raw.debugRawText : undefined,
   };
 }

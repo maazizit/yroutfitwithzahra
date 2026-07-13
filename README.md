@@ -105,15 +105,44 @@ Tant que la table `products` est vide, l'app affiche le catalogue de démonstrat
 | `EXPO_PUBLIC_SUPABASE_URL` | idem | App mobile |
 | `EXPO_PUBLIC_SUPABASE_KEY` | idem | App mobile |
 | `SUPABASE_DB_PASSWORD` | idem | Scripts import / migrations |
-| `GEMINI_API_KEY` | idem | Styliste IA (Edge Function) |
+| `GEMINI_API_KEY` | idem | Styliste IA + **tagging morphologique du catalogue** (import Awin) |
 | `AWIN_FEED_URL` | idem | Import catalogue Awin |
 | `SUPABASE_ACCESS_TOKEN` | optionnel (`sbp_...`) | Déploiement CLI Edge Functions |
+
+⚠️ Sans `GEMINI_API_KEY` sur le workflow GitHub Actions, l'import retombe sur un tagging par
+mots-clés (moins fiable) — voir la section Qualité du tagging ci-dessous.
 
 Import manuel du catalogue :
 
 ```bash
 npm run import:awin
 ```
+
+## 🎯 Qualité du tagging morphologique (cœur du produit)
+
+Chaque produit importé reçoit des tags de morphologie (`sablier`, `poire`, `pomme`, `rectangle`,
+`triangle_inverse`) qui pilotent le badge « Idéal pour Silhouette » et le tri du feed. Deux sources
+possibles, tracées dans la colonne `tag_source` :
+
+- **`gemini`** (source de vérité) : chaque nouveau produit est tagué par Gemini 2.0 Flash avec un
+  prompt détaillant des critères de style concrets par morphologie (voir
+  `supabase/functions/tag-morphology/index.ts`). Un produit déjà tagué par Gemini n'est **jamais
+  re-tagué** lors des imports suivants (cache — économise le quota gratuit). Limité à
+  `GEMINI_TAG_LIMIT` nouveaux produits par run (200 par défaut, réglable en variable d'env).
+- **`heuristic`** (filet de secours) : si `GEMINI_API_KEY` est absente ou le quota atteint, un jeu
+  de règles par mots-clés prend le relais. Volontairement prudent : un vêtement sans signal de
+  coupe reconnu reçoit les 5 tags plutôt qu'un choix arbitraire.
+
+**Avant de scaler l'import sur tout le catalogue**, valide la qualité sur un échantillon :
+
+```bash
+npm run audit:tags
+```
+
+Envoie 13 descriptions de vêtements tests (robe portefeuille, blazer oversize, col bateau…) à
+`tag-morphology` en mode `debug` et affiche les tags renvoyés à côté de l'avis d'un guide de style
+standard, pour repérer les erreurs évidentes avant de faire confiance au pipeline. Résultat complet
+sauvegardé dans `audit-tags-result.json` (non commité).
 
 ## 🔗 Affiliation Awin
 

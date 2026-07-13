@@ -10,7 +10,8 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "setup:backend": "powershell -ExecutionPolicy Bypass -File scripts/setup-backend.ps1",
-    "import:awin": "node scripts/import-awin.js"
+    "import:awin": "node scripts/import-awin.js",
+    "audit:tags": "node scripts/audit-tags.js"
   },
   "dependencies": {
     "@expo/vector-icons": "14.1.0",

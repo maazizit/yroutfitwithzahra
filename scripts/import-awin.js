@@ -74,13 +74,34 @@ function isClothingProduct(name, merchantCategory) {
   if (NON_CLOTHING.test(haystack)) return false;
   return CLOTHING_HINT.test(haystack);
 }
+// Filet de secours utilisé seulement quand Gemini est indisponible/épuisé
+// (voir tagWithGemini). Volontairement plus large que la V1 pour capturer
+// les signaux d'épaule (poire/triangle_inverse) et les coupes neutres —
+// voir l'audit du 2026-07 : l'ancien fallback ['sablier','rectangle'] par
+// défaut sur-représentait ces deux morphologies dans tout le catalogue.
+const SHOULDER_STRUCTURE = /épaulettes|epaulettes|structur|oversize|oversized|col bateau|carrure marquée|carrure marquee|manches? ballon|manches? bouffantes?/i;
+const WAIST_DEFINED = /wrap|portefeuille|cintr|belted|ceintur|bodycon|moulant|taille marquée|taille marquee/i;
+const BOTTOM_VOLUME = /a-line|évasé|evase|trapèze|trapeze|flare|wide leg|palazzo|large|jambe large/i;
+const NO_WAIST_FLOW = /empire|fluide|flowy|v-neck|col v|drap|crayon|sheath|droit(e)?\b/i;
+const CURVE_CREATING = /peplum|volant|ruffle|volume|cardigan long|gilet long|tunique/i;
+
 const TAG_RULES = [
-  [/wrap|portefeuille|cintr|belted|ceintur|bodycon|moulant/i, ['sablier']],
-  [/a-line|évasé|evase|trapèze|trapeze|flare/i, ['poire', 'triangle_inverse']],
-  [/empire|fluide|flowy|v-neck|col v|drap/i, ['pomme']],
-  [/peplum|volant|ruffle|volume/i, ['rectangle']],
-  [/wide leg|palazzo|large/i, ['triangle_inverse', 'poire']],
+  // Signal fort de taille marquée → sablier
+  [WAIST_DEFINED, ['sablier']],
+  // Volume en bas (jupe/pantalon évasé) → poire + triangle_inverse
+  [BOTTOM_VOLUME, ['poire', 'triangle_inverse']],
+  // Structure d'épaule → bon pour poire/rectangle/pomme, PAS triangle_inverse
+  [SHOULDER_STRUCTURE, ['poire', 'rectangle', 'pomme']],
+  // Coupe fluide sans marquage de taille → pomme
+  [NO_WAIST_FLOW, ['pomme', 'rectangle']],
+  // Détails qui créent une courbe → rectangle
+  [CURVE_CREATING, ['rectangle', 'pomme']],
 ];
+
+/** Vêtement dont le nom ne contient aucun signal de coupe (t-shirt basique, jean uni…). */
+function looksNeutral(text) {
+  return !TAG_RULES.some(([pattern]) => pattern.test(text));
+}
 
 function parseCsvLine(line) {
   const cells = [];
@@ -109,12 +130,18 @@ function inferCategory(text) {
   return 'Hauts';
 }
 
+/**
+ * Tagging heuristique (filet de secours, pas la source principale — voir
+ * tagWithGemini). Un article sans aucun signal de coupe reçoit les 5 tags
+ * plutôt qu'un couple par défaut arbitraire : on ne prétend pas savoir ce
+ * qu'on ne sait pas.
+ */
 function inferTags(text) {
   const tags = new Set();
   for (const [pattern, matched] of TAG_RULES) {
     if (pattern.test(text)) matched.forEach((t) => tags.add(t));
   }
-  if (tags.size === 0) ['sablier', 'rectangle'].forEach((t) => tags.add(t));
+  if (tags.size === 0) ALLOWED_TAGS.forEach((t) => tags.add(t));
   return [...tags].filter((t) => ALLOWED_TAGS.includes(t));
 }
 
@@ -201,6 +228,105 @@ function extractColours(cells, colourIdx, name, description) {
   if (fromColumn.length) return fromColumn;
   return inferColoursFromText(`${name} ${description ?? ''}`);
 }
+
+// ⚠️ Garder ce prompt aligné avec supabase/functions/tag-morphology/index.ts
+// (deux runtimes différents — Deno pour l'Edge Function, Node ici — donc
+// pas de fichier partagé simple, d'où la duplication volontaire).
+const GEMINI_SYSTEM_PROMPT = `Tu es styliste mode spécialisée en morphologie féminine. On te donne la description
+d'un vêtement. Ta seule sortie est un objet JSON strict, sans markdown, sans texte
+autour, avec exactement ces clés : {"tags": [...], "category": "...", "confidence": 0.0}
+
+## Les 5 morphologies — critères concrets (pas de généralités)
+
+- "sablier" (épaules ≈ hanches, taille marquée) : favorisé par tout ce qui SOULIGNE la taille —
+  cintré, portefeuille, ceinturé, bodycon, taille marquée. Défavorisé par les coupes droites/amples
+  sans marquage de taille.
+- "poire" (hanches > épaules) : favorisé par le VOLUME EN HAUT (épaules structurées, manches
+  ballon/bouffantes, col bateau, épaulettes) et les bas fluides/évasés à partir de la taille
+  (trapèze, A-line, palazzo). Défavorisé par les hauts moulants sans structure et les jupes crayon
+  serrées sur les hanches.
+- "pomme" (buste/ventre plus généreux, taille peu marquée) : favorisé par les coupes qui NE
+  SERRENT PAS la taille — empire, fluide, drapé, col en V profond, matières fluides. Défavorisé
+  par tout ce qui est moulant/ceinturé à la taille naturelle.
+- "rectangle" (silhouette droite, peu de courbes) : favorisé par ce qui CRÉE des courbes —
+  péplum, volants, ceinture marquée, superpositions. Défavorisé par les coupes très droites sans
+  aucun détail structurant.
+- "triangle_inverse" (épaules > hanches) : favorisé par le VOLUME EN BAS (jupe/pantalon évasé,
+  palazzo, wide leg) et les hauts SANS structure d'épaule. Défavorisé par tout ce qui ajoute du
+  volume aux épaules (épaulettes, manches structurées, col bateau, blazer à épaules marquées) —
+  même si ce même vêtement est excellent pour "poire".
+
+## Règles de sortie
+
+1. "tags" : 1 à 3 morphologies MAXIMUM — seulement celles clairement recommandées par un guide de
+   style. N'inclus jamais une morphologie pour laquelle le vêtement a un effet négatif documenté.
+2. Vêtement universel/neutre (t-shirt basique, jean droit sans détail, chaussures, bijoux
+   basiques) : renvoie les 5 tags plutôt que d'en choisir 1-3 arbitrairement.
+3. Accessoire sans lien structurel avec la silhouette (boucles d'oreilles, collier, petit sac) :
+   renvoie tags: [] et confidence: 0.2.
+4. "category" : une seule valeur parmi "Robes", "Hauts", "Bas", "Vestes", "Accessoires".
+5. "confidence" : 0 à 1, reflète ta certitude sur le jugement morphologique.
+6. Aucune autre clé. JSON pur uniquement.
+
+Exemples :
+Vêtement : Blazer oversize épaules structurées, coupe droite
+→ {"tags":["poire","rectangle","pomme"],"category":"Vestes","confidence":0.85}
+Vêtement : T-shirt basique coton, coupe droite
+→ {"tags":["sablier","poire","pomme","rectangle","triangle_inverse"],"category":"Hauts","confidence":0.6}`;
+
+/**
+ * Tague un vêtement via Gemini 2.0 Flash (même prompt que l'Edge Function
+ * tag-morphology). Renvoie null si la clé est absente ou l'appel échoue —
+ * l'appelant doit alors garder le tag heuristique (fallback silencieux,
+ * ne bloque jamais l'import).
+ */
+async function tagWithGemini(apiKey, description) {
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: GEMINI_SYSTEM_PROMPT }] },
+          contents: [{ role: 'user', parts: [{ text: `Vêtement : ${description.slice(0, 500)}` }] }],
+          generationConfig: {
+            temperature: 0.1,
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: 'OBJECT',
+              properties: {
+                tags: { type: 'ARRAY', items: { type: 'STRING', enum: ALLOWED_TAGS } },
+                category: {
+                  type: 'STRING',
+                  enum: ['Robes', 'Hauts', 'Bas', 'Vestes', 'Accessoires'],
+                },
+                confidence: { type: 'NUMBER' },
+              },
+              required: ['tags', 'category', 'confidence'],
+            },
+          },
+        }),
+      },
+    );
+    if (!response.ok) return null;
+    const payload = await response.json();
+    const text = payload?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) return null;
+    const parsed = JSON.parse(text);
+    const tags = Array.isArray(parsed.tags)
+      ? parsed.tags.filter((t) => ALLOWED_TAGS.includes(t))
+      : [];
+    const category = ['Robes', 'Hauts', 'Bas', 'Vestes', 'Accessoires'].includes(parsed.category)
+      ? parsed.category
+      : null;
+    return { tags, category, confidence: Number(parsed.confidence) || 0 };
+  } catch {
+    return null;
+  }
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function main() {
   loadEnv();
@@ -321,17 +447,70 @@ async function main() {
   });
   await client.connect();
 
-  const cols = ['id', 'name', 'brand', 'price', 'original_price', 'currency', 'image', 'url', 'awin_mid', 'tags', 'category', 'modest', 'sizes', 'colours', 'gender'];
+  // --- Tagging morphologique via Gemini (source de vérité), avec cache et
+  // repli sur l'heuristique. On ne re-tague jamais un produit déjà tagué
+  // par Gemini lors d'un run précédent (économise le quota gratuit).
+  const geminiKey = process.env.GEMINI_API_KEY;
+  const tagLimit = Number(process.env.GEMINI_TAG_LIMIT) || 200;
+  if (rows.length > 0) {
+    const { rows: existing } = await client.query(
+      `SELECT id, tags, category, tag_source FROM public.products WHERE id = ANY($1)`,
+      [rows.map((r) => r.id)],
+    );
+    const cached = new Map(existing.map((r) => [r.id, r]));
+
+    let geminiCalls = 0;
+    let geminiFailures = 0;
+    for (const row of rows) {
+      const prev = cached.get(row.id);
+      if (prev?.tag_source === 'gemini') {
+        // Déjà tagué par Gemini précédemment : on garde tel quel.
+        row.tags = prev.tags;
+        row.category = prev.category;
+        row.tag_source = 'gemini';
+        continue;
+      }
+      if (!geminiKey || geminiCalls >= tagLimit) {
+        row.tag_source = 'heuristic';
+        continue;
+      }
+      geminiCalls += 1;
+      const description = `${row.name}`;
+      const result = await tagWithGemini(geminiKey, description);
+      if (result) {
+        row.tags = result.tags.length > 0 ? result.tags : ALLOWED_TAGS.slice();
+        if (result.category) row.category = result.category;
+        row.tag_source = 'gemini';
+      } else {
+        geminiFailures += 1;
+        row.tag_source = 'heuristic';
+      }
+      await sleep(150); // reste sous les limites de débit du tier gratuit
+    }
+    if (geminiKey) {
+      console.log(
+        `Tagging Gemini : ${geminiCalls - geminiFailures}/${geminiCalls} réussis` +
+          (rows.length - geminiCalls > 0
+            ? `, ${rows.length - geminiCalls} article(s) laissés en heuristique (cache ou quota)`
+            : ''),
+      );
+    } else {
+      console.log('GEMINI_API_KEY absente : tagging heuristique uniquement (voir audit-tags.js).');
+    }
+  }
+
+  const cols = ['id', 'name', 'brand', 'price', 'original_price', 'currency', 'image', 'url', 'awin_mid', 'tags', 'category', 'modest', 'sizes', 'colours', 'gender', 'tag_source'];
   const values = [];
   const params = [];
   let p = 1;
   for (const row of rows) {
     values.push(
-      `($${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++})`,
+      `($${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++},$${p++})`,
     );
     params.push(
       row.id, row.name, row.brand, row.price, row.original_price, row.currency,
       row.image, row.url, row.awin_mid, row.tags, row.category, row.modest, row.sizes, row.colours, row.gender,
+      row.tag_source ?? 'heuristic',
     );
   }
 
@@ -354,6 +533,7 @@ async function main() {
       sizes = EXCLUDED.sizes,
       colours = EXCLUDED.colours,
       gender = EXCLUDED.gender,
+      tag_source = EXCLUDED.tag_source,
       updated_at = now()
   `;
     await client.query(sql, params);

@@ -1,5 +1,7 @@
 # Importe le flux produits Awin dans la table Supabase `products`.
-# Utilise les secrets GitHub : AWIN_FEED_URL, SUPABASE_DB_PASSWORD, SUPABASE_PROJECT_REF.
+# Utilise les secrets GitHub : AWIN_FEED_URL, SUPABASE_DB_PASSWORD, SUPABASE_PROJECT_REF,
+# GEMINI_API_KEY (optionnel — sans lui, le tagging retombe sur l'heuristique par mots-clés,
+# moins fiable : voir l'audit du tagging morphologique).
 #
 # ⚠️ Les secrets sont des "Environment secrets" : le job doit référencer le même
 # environnement que celui créé dans Settings → Environments. Si le tien ne
@@ -33,4 +35,5 @@ jobs:
           AWIN_FEED_URL: ${{ secrets.AWIN_FEED_URL }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: node scripts/import-awin.js

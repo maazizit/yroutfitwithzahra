@@ -5,21 +5,72 @@
 // Déploiement :
 //   supabase functions deploy tag-morphology
 //   supabase secrets set GEMINI_API_KEY=<ta_clé_AI_Studio>
+//
+// Debug : passer { "debug": true } dans le body pour recevoir en plus le
+// texte brut renvoyé par Gemini (utile pour valider un échantillon avant
+// de scaler — voir scripts/audit-tags.js).
 
 const ALLOWED_TAGS = ['sablier', 'poire', 'pomme', 'rectangle', 'triangle_inverse'] as const;
+const ALL_TAGS = [...ALLOWED_TAGS];
 
-const SYSTEM_PROMPT = `Tu es un moteur de classification mode. On te donne la description et/ou la photo d'un vêtement.
-Ta seule sortie est un objet JSON strict, sans markdown, sans texte autour, avec exactement ces clés :
-{"tags": [...], "category": "...", "confidence": 0.0}
+const SYSTEM_PROMPT = `Tu es styliste mode spécialisée en morphologie féminine. On te donne la description
+et/ou la photo d'un vêtement. Ta seule sortie est un objet JSON strict, sans markdown, sans texte
+autour, avec exactement ces clés : {"tags": [...], "category": "...", "confidence": 0.0}
 
-Règles :
-- "tags" : les morphologies féminines que ce vêtement met en valeur, parmi UNIQUEMENT :
-  "sablier" (taille marquée), "poire" (hanches > épaules), "pomme" (buste généreux),
-  "rectangle" (silhouette droite), "triangle_inverse" (épaules > hanches).
-  Entre 1 et 3 valeurs, les plus pertinentes seulement.
-- "category" : une seule valeur parmi "Robes", "Hauts", "Bas", "Vestes", "Accessoires".
-- "confidence" : nombre entre 0 et 1.
-- Aucune autre clé. Aucun commentaire. Aucun QCM. JSON pur uniquement.`;
+## Les 5 morphologies — critères concrets (pas de généralités)
+
+- "sablier" (épaules ≈ hanches, taille marquée) : favorisé par tout ce qui SOULIGNE la taille —
+  cintré, portefeuille, ceinturé, bodycon, taille marquée. Défavorisé par les coupes droites/amples
+  sans marquage de taille (ça cache l'atout principal).
+- "poire" (hanches > épaules) : favorisé par le VOLUME EN HAUT (épaules structurées, manches
+  ballon/bouffantes, col bateau, épaulettes) et les bas fluides/évasés à partir de la taille
+  (trapèze, A-line, palazzo) qui glissent sur les hanches sans ajouter de volume. Défavorisé par les
+  hauts moulants sans structure et les jupes crayon serrées sur les hanches.
+- "pomme" (buste/ventre plus généreux, taille peu marquée) : favorisé par les coupes qui NE
+  SERRENT PAS la taille — empire, fluide, drapé, col en V profond (allonge le buste), matières
+  fluides. Défavorisé par tout ce qui est moulant/ceinturé à la taille naturelle.
+- "rectangle" (silhouette droite, peu de courbes) : favorisé par ce qui CRÉE des courbes —
+  péplum, volants, ceinture marquée, superpositions, volume asymétrique. Défavorisé par les coupes
+  très droites sans aucun détail structurant (ça accentue le côté "planche").
+- "triangle_inverse" (épaules > hanches) : favorisé par le VOLUME EN BAS (jupe/pantalon évasé,
+  palazzo, wide leg) et les hauts SANS structure d'épaule (col V, épaules nues, sans épaulettes).
+  Défavorisé par tout ce qui ajoute du volume aux épaules (épaulettes, manches structurées, col
+  bateau, blazer à épaules marquées) — même si ce même vêtement est excellent pour "poire".
+
+## Règles de sortie
+
+1. "tags" : 1 à 3 morphologies MAXIMUM parmi la liste ci-dessus — seulement celles pour
+   lesquelles le vêtement est un choix clairement recommandé par un guide de style. N'invente
+   rien : si le vêtement a un effet négatif documenté sur une morphologie (ex. col bateau et
+   triangle_inverse), NE PAS l'inclure.
+2. Vêtement universel ou neutre (t-shirt basique, jean droit sans détail, pull uni, chaussures,
+   la plupart des bijoux) : renvoie les 5 tags — ["sablier","poire","pomme","rectangle","triangle_inverse"] —
+   plutôt que d'en choisir 1-3 arbitrairement. Ne présente jamais un vêtement neutre comme un choix
+   "spécialement recommandé" pour seulement 2 morphologies par défaut.
+3. Accessoire sans lien structurel avec la silhouette (boucles d'oreilles, collier, lunettes,
+   petit sac à main) : renvoie tags: [] et confidence: 0.2 — ne force pas une réponse.
+4. "category" : une seule valeur parmi "Robes", "Hauts", "Bas", "Vestes", "Accessoires".
+5. "confidence" : 0 à 1, réflète ta certitude réelle sur le jugement morphologique (pas sur la
+   catégorie). Un vêtement décrit en une phrase vague → confidence basse (~0.3-0.5). Une
+   description détaillée avec coupe/matière précises → confidence haute (~0.8-0.95).
+6. Aucune autre clé. Aucun commentaire. Aucun QCM. JSON pur uniquement.
+
+## Exemples (few-shot)
+
+Vêtement : Blazer oversize épaules structurées, coupe droite
+→ {"tags":["poire","rectangle","pomme"],"category":"Vestes","confidence":0.85}
+
+Vêtement : Haut col bateau structuré, manches courtes
+→ {"tags":["poire"],"category":"Hauts","confidence":0.75}
+
+Vêtement : Robe empire manches ballon, tissu fluide
+→ {"tags":["pomme"],"category":"Robes","confidence":0.85}
+
+Vêtement : T-shirt basique coton, coupe droite
+→ {"tags":["sablier","poire","pomme","rectangle","triangle_inverse"],"category":"Hauts","confidence":0.6}
+
+Vêtement : Boucles d'oreilles créoles dorées
+→ {"tags":[],"category":"Accessoires","confidence":0.2}`;
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -38,6 +89,7 @@ interface RequestBody {
   description?: string;
   imageBase64?: string;
   mimeType?: string;
+  debug?: boolean;
 }
 
 Deno.serve(async (req) => {
@@ -87,6 +139,21 @@ Deno.serve(async (req) => {
         generationConfig: {
           temperature: 0.1,
           responseMimeType: 'application/json',
+          responseSchema: {
+            type: 'OBJECT',
+            properties: {
+              tags: {
+                type: 'ARRAY',
+                items: { type: 'STRING', enum: ALL_TAGS },
+              },
+              category: {
+                type: 'STRING',
+                enum: ['Robes', 'Hauts', 'Bas', 'Vestes', 'Accessoires'],
+              },
+              confidence: { type: 'NUMBER' },
+            },
+            required: ['tags', 'category', 'confidence'],
+          },
         },
       }),
     },
@@ -119,5 +186,10 @@ Deno.serve(async (req) => {
   const confidenceRaw = typeof parsed.confidence === 'number' ? parsed.confidence : 0;
   const confidence = Math.min(1, Math.max(0, confidenceRaw));
 
-  return json({ tags, category, confidence });
+  return json({
+    tags,
+    category,
+    confidence,
+    ...(body.debug ? { debugRawText: text } : {}),
+  });
 });

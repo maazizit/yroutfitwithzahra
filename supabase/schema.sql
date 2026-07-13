@@ -37,6 +37,12 @@ create policy "products_public_read"
 -- Aucune policy insert/update/delete pour anon/authenticated :
 -- seule la service_role key (Edge Function sync-awin-feed) peut écrire.
 
+-- Provenance du tagging morphologique (voir supabase/migrations/20260713060000_products_tag_source.sql)
+alter table public.products
+  add column if not exists tag_source text not null default 'heuristic'
+  check (tag_source in ('gemini', 'heuristic'));
+create index if not exists products_tag_source_idx on public.products (tag_source);
+
 -- ─────────────────────────────────────────────────────────────
 -- CRON : rafraîchir le catalogue depuis le flux Awin 2x/jour.
 -- Prérequis : extensions pg_cron + pg_net activées (Dashboard → Database → Extensions),
