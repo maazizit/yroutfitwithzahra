@@ -51,6 +51,16 @@ loadDotEnv();
 
 async function testConnection(label, config) {
   console.log(`— ${label} —`);
+  if (config.connectionString) {
+    try {
+      new URL(config.connectionString);
+    } catch {
+      console.error('❌ SUPABASE_DB_URL invalide — format attendu :');
+      console.error('   postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres');
+      console.error('   (le @ avant l\'hôte est obligatoire)');
+      return false;
+    }
+  }
   const client = new Client({ ...config, connectionTimeoutMillis: 15000 });
   const started = Date.now();
   try {
