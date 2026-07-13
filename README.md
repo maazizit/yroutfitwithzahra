@@ -144,6 +144,9 @@ Envoie 13 descriptions de vêtements tests (robe portefeuille, blazer oversize, 
 standard, pour repérer les erreurs évidentes avant de faire confiance au pipeline. Résultat complet
 sauvegardé dans `audit-tags-result.json` (non commité).
 
+📖 **Documentation complète** (architecture du pipeline, prompt détaillé, résultats de l'audit
+initial, variables d'environnement) : [`docs/tagging-morphologie.md`](docs/tagging-morphologie.md).
+
 ## 🔗 Affiliation Awin
 
 - Compte publisher : ID `2982087`.
