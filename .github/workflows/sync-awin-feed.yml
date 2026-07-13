@@ -5,9 +5,8 @@
 # GEMINI_API_KEY (optionnel — sans lui, le tagging retombe sur l'heuristique par mots-clés,
 # moins fiable : voir docs/tagging-morphologie.md).
 #
-# Secrets attendus en "Repository secrets" (Settings → Secrets and variables
-# → Actions → onglet Secrets, PAS dans un Environment) — évite les échecs
-# silencieux si le nom d'un environnement ne correspond pas exactement.
+# Secrets attendus dans l'Environment "prod" (Settings → Environments →
+# prod). Le job doit déclarer environment: prod pour y avoir accès.
 
 name: Sync Awin feed
 
@@ -19,6 +18,7 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    environment: prod
     steps:
       - uses: actions/checkout@v4
 
