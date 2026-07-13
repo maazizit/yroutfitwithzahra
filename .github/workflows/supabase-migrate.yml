@@ -5,12 +5,8 @@
 # est sûr — pas besoin de suivre "quelle migration a déjà tourné".
 #
 # Secrets utilisés (Environment "prod") :
-#   SUPABASE_DB_URL (recommandé) — connexion "Session pooler" copiée depuis
-#     Supabase → Connect → Session pooler (compatible IPv4 : la connexion
-#     directe db.<ref>.supabase.co est IPv6-only et injoignable depuis les
-#     runners GitHub Actions — "Network is unreachable").
-#   ou, à défaut : SUPABASE_DB_PASSWORD + SUPABASE_PROJECT_REF (connexion
-#     directe — ne fonctionnera pas en CI sans IPv4 add-on Supabase).
+#   SUPABASE_DB_URL (recommandé) — Session pooler (IPv4, compatible GitHub Actions)
+#   ou SUPABASE_DB_PASSWORD + SUPABASE_PROJECT_REF (connexion directe IPv6 — échoue en CI)
 
 name: Supabase — migrate database
 
@@ -29,21 +25,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install psql
-        run: sudo apt-get update -y && sudo apt-get install -y --no-install-recommends postgresql-client
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install pg
+        run: npm install --no-save pg
 
       - name: Run migrations
         env:
-          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
         run: |
-          set -e
-          if [ -n "$DB_URL" ]; then
-            CONN="$DB_URL"
-          elif [ -n "$PGPASSWORD" ] && [ -n "$PROJECT_REF" ]; then
-            CONN="host=db.$PROJECT_REF.supabase.co port=5432 dbname=postgres user=postgres sslmode=require"
-          else
+          set -euo pipefail
+          if [ -z "${SUPABASE_DB_URL:-}" ] && [ -z "${SUPABASE_DB_PASSWORD:-}" ]; then
             echo "SUPABASE_DB_URL (recommandé) ou SUPABASE_DB_PASSWORD+SUPABASE_PROJECT_REF manquants." >&2
             exit 1
           fi
@@ -55,6 +51,6 @@ jobs:
           fi
           for f in "${files[@]}"; do
             echo "→ $f"
-            psql "$CONN" -v ON_ERROR_STOP=1 -f "$f"
+            node scripts/run-migration.js "$f"
           done
           echo "Migrations appliquées : ${#files[@]} fichier(s)."

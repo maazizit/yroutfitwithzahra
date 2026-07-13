@@ -1,19 +1,22 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   Easing,
   FlatList,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FadeInView, ScalePressable } from '@/components/anim';
-import { ZahraAvatar } from '@/components/ZahraAvatar';
+import { ZahraAvatar, type ZahraMood } from '@/components/ZahraAvatar';
 import { useProfile } from '@/lib/profile';
 import { askZahra, QUICK_PROMPTS, welcomeMessage, type ZahraMessage } from '@/lib/zahra';
 import { colors, radius, serif, shadow } from '@/theme';
@@ -46,14 +49,14 @@ function TypingDots() {
   );
 }
 
-function Bubble({ message }: { message: ZahraMessage }) {
+function Bubble({ message, mood }: { message: ZahraMessage; mood?: ZahraMood }) {
   const isZahra = message.role === 'zahra';
   return (
     <FadeInView dy={10} duration={350}>
       <View style={[styles.bubbleRow, isZahra ? styles.rowZahra : styles.rowUser]}>
         {isZahra && (
           <View style={styles.bubbleAvatar}>
-            <ZahraAvatar size={30} />
+            <ZahraAvatar size={30} mood={mood ?? 'idle'} />
           </View>
         )}
         <View style={[styles.bubble, isZahra ? styles.bubbleZahra : styles.bubbleUser]}>
@@ -65,18 +68,46 @@ function Bubble({ message }: { message: ZahraMessage }) {
 }
 
 export default function ZahraScreen() {
-  const { profile } = useProfile();
+  const router = useRouter();
+  const { profile, loading: profileLoading } = useProfile();
   const [messages, setMessages] = useState<ZahraMessage[]>([]);
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
+  const [inputFocused, setInputFocused] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
   const listRef = useRef<FlatList<ZahraMessage>>(null);
   const counter = useRef(0);
+
+  const mood: ZahraMood = thinking
+    ? 'thinking'
+    : speaking
+      ? 'speaking'
+      : inputFocused
+        ? 'listening'
+        : 'idle';
+
+  const statusLabel =
+    mood === 'thinking'
+      ? 'Zahra réfléchit à ton look…'
+      : mood === 'speaking'
+        ? 'Zahra te répond'
+        : mood === 'listening'
+          ? 'Zahra t\'écoute'
+          : 'Ta styliste est en ligne';
 
   useEffect(() => {
     if (profile && messages.length === 0) {
       setMessages([welcomeMessage(profile)]);
     }
   }, [profile, messages.length]);
+
+  useEffect(() => {
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== 'zahra' || last.id === 'welcome') return;
+    setSpeaking(true);
+    const timer = setTimeout(() => setSpeaking(false), 2800);
+    return () => clearTimeout(timer);
+  }, [messages]);
 
   const send = useCallback(
     async (raw?: string) => {
@@ -103,19 +134,43 @@ export default function ZahraScreen() {
     return () => clearTimeout(timer);
   }, [messages, thinking]);
 
-  if (!profile) return null;
+  if (profileLoading) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={styles.center}>
+          <ZahraAvatar size={56} mood="idle" entrance />
+          <ActivityIndicator color={colors.accent} style={{ marginTop: 16 }} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={styles.center}>
+          <ZahraAvatar size={56} mood="idle" entrance />
+          <Text style={styles.emptyTitle}>Conseils with Zahra</Text>
+          <Text style={styles.emptyText}>Crée d'abord ton profil de style pour que Zahra te connaisse.</Text>
+          <Pressable style={styles.emptyCta} onPress={() => router.push('/onboarding')}>
+            <Text style={styles.emptyCtaText}>Créer mon profil</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <ZahraAvatar size={44} />
+        <ZahraAvatar size={44} mood={mood} entrance />
         <View style={styles.headerText}>
           <Text style={styles.headerTitle}>
             Conseils <Text style={styles.headerWith}>with</Text> Zahra
           </Text>
           <View style={styles.statusRow}>
-            <View style={styles.statusDot} />
-            <Text style={styles.statusText}>Ta styliste est en ligne</Text>
+            <View style={[styles.statusDot, thinking && styles.statusDotThinking]} />
+            <Text style={styles.statusText}>{statusLabel}</Text>
           </View>
         </View>
       </View>
@@ -129,16 +184,22 @@ export default function ZahraScreen() {
           ref={listRef}
           data={messages}
           keyExtractor={(m) => m.id}
-          renderItem={({ item }) => <Bubble message={item} />}
+          renderItem={({ item }) => (
+            <Bubble
+              message={item}
+              mood={item.role === 'zahra' && item.id === messages[messages.length - 1]?.id ? mood : 'idle'}
+            />
+          )}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           ListFooterComponent={
             thinking ? (
               <View style={[styles.bubbleRow, styles.rowZahra]}>
                 <View style={styles.bubbleAvatar}>
-                  <ZahraAvatar size={30} />
+                  <ZahraAvatar size={30} mood="thinking" />
                 </View>
-                <View style={[styles.bubble, styles.bubbleZahra]}>
+                <View style={[styles.bubble, styles.bubbleZahra, styles.thinkingBubble]}>
+                  <Text style={styles.thinkingText}>Je regarde ce qui te mettra en valeur…</Text>
                   <TypingDots />
                 </View>
               </View>
@@ -163,6 +224,8 @@ export default function ZahraScreen() {
             placeholderTextColor={colors.faint}
             value={input}
             onChangeText={setInput}
+            onFocus={() => setInputFocused(true)}
+            onBlur={() => setInputFocused(false)}
             onSubmitEditing={() => send()}
             returnKeyType="send"
             multiline
@@ -223,6 +286,9 @@ const styles = StyleSheet.create({
     height: 7,
     borderRadius: 4,
     backgroundColor: '#6FA97A',
+  },
+  statusDotThinking: {
+    backgroundColor: colors.accent,
   },
   statusText: {
     fontSize: 11.5,
@@ -286,6 +352,14 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: colors.accent,
   },
+  thinkingBubble: {
+    gap: 6,
+  },
+  thinkingText: {
+    fontSize: 13,
+    fontStyle: 'italic',
+    color: colors.muted,
+  },
   quickWrap: {
     paddingVertical: 8,
   },
@@ -342,5 +416,37 @@ const styles = StyleSheet.create({
     color: colors.gold,
     fontSize: 20,
     fontWeight: '700',
+  },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 28,
+    gap: 12,
+  },
+  emptyTitle: {
+    fontFamily: serif,
+    fontSize: 22,
+    color: colors.ink,
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  emptyText: {
+    fontFamily: serif,
+    fontSize: 15,
+    color: colors.muted,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  emptyCta: {
+    backgroundColor: colors.ink,
+    borderRadius: radius.pill,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    marginTop: 8,
+  },
+  emptyCtaText: {
+    color: colors.white,
+    fontWeight: '600',
   },
 });

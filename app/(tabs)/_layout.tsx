@@ -102,7 +102,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="zahra"
         options={{
-          title: 'Zahra',
+          title: 'Conseils',
           tabBarIcon: ({ color, size, focused }) => (
             <TabIcon name="message-circle" color={color} size={size} focused={focused} />
           ),

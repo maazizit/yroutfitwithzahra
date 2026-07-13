@@ -166,6 +166,6 @@ export function welcomeMessage(profile: UserProfile): ZahraMessage {
   return {
     id: 'welcome',
     role: 'zahra',
-    text: `Bienvenue dans mon salon de style 🌸\n\nJe suis Zahra. Mode ${genderLabel(profile.gender)}, silhouette ${morphologyLabel(profile.morphology)}, budget ${profile.budget} € — j'ai déjà tout en tête.${modestNote}\n\nDis-moi pour quelle occasion tu veux briller, ou choisis une question ci-dessous 👇`,
+    text: `Bienvenue dans mon salon de style 🌸\n\nMoi c'est Zahra — on va trouver des looks qui te ressemblent vraiment. J'ai déjà ton profil : mode ${genderLabel(profile.gender)}, silhouette ${morphologyLabel(profile.morphology)}, budget ${profile.budget} €.${modestNote}\n\nDis-moi l'occasion ou tape ta question — je suis là pour toi 💛`,
   };
 }

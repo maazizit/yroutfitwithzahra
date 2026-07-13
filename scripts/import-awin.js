@@ -24,6 +24,7 @@ const https = require('https');
 const zlib = require('zlib');
 const { promisify } = require('util');
 const { Client } = require('pg');
+const { resolveDbConnection } = require('./db-connection');
 
 const gunzip = promisify(zlib.gunzip);
 
@@ -552,29 +553,6 @@ async function upsertRows(client, rows) {
       updated_at = now()
   `;
   await client.query(sql, params);
-}
-
-/**
- * Connexion Postgres : privilégie SUPABASE_DB_URL (Session pooler, IPv4 —
- * copié depuis Supabase → Connect → Session pooler) si présente, sinon
- * retombe sur la connexion directe db.<ref>.supabase.co construite depuis
- * SUPABASE_DB_PASSWORD + SUPABASE_PROJECT_REF.
- *
- * ⚠️ La connexion directe est IPv6-only côté Supabase depuis 2024 et
- * échoue avec "Network is unreachable" sur les runners GitHub Actions
- * (pas d'IPv6). En CI, configure SUPABASE_DB_URL.
- */
-function resolveDbConnection() {
-  const dbUrl = process.env.SUPABASE_DB_URL;
-  if (dbUrl) return { connectionString: dbUrl, ssl: { rejectUnauthorized: false } };
-
-  const dbPassword = process.env.SUPABASE_DB_PASSWORD;
-  const projectRef = process.env.SUPABASE_PROJECT_REF || 'cuwtknywzfyvhuuvvrpd';
-  if (!dbPassword) return null;
-  return {
-    connectionString: `postgresql://postgres:${encodeURIComponent(dbPassword)}@db.${projectRef}.supabase.co:5432/postgres`,
-    ssl: { rejectUnauthorized: false },
-  };
 }
 
 async function main() {
